@@ -8,6 +8,7 @@ import doit
 import numpy as np
 import pykoop
 import tomli
+from matplotlib import pyplot as plt
 
 # Directory containing ``dodo.py``
 WD = pathlib.Path(__file__).parent.resolve()
@@ -27,6 +28,22 @@ def task_pickle():
             'actions': [(action_pickle, [[dataset]])],
             'targets': [target],
             'uptodate': [doit.tools.check_timestamp_unchanged(str(dataset))],
+            'clean': True,
+        }
+
+
+def task_plot_pickle():
+    """Plot pickled data."""
+    datasets = ['training_controller', 'test_controller']
+    for name in datasets:
+        file_dep = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
+        target = WD.joinpath(f'build/plots/{name}')
+        yield {
+            'name': name,
+            'actions': [action_plot_pickle],
+            'file_dep': [file_dep],
+            'task_dep': ['pickle'],
+            'targets': [target],
             'clean': True,
         }
 
@@ -168,3 +185,86 @@ def action_pickle(dependencies, targets):
     pathlib.Path(targets[0]).parent.mkdir(parents=True, exist_ok=True)
     with open(targets[0], 'wb') as f:
         pickle.dump(output_dict, f)
+
+
+def action_plot_pickle(dependencies, targets):
+    """Plot pickled data."""
+    # Load pickle
+    with open(dependencies[0], 'rb') as f:
+        dataset = pickle.load(f)
+    # Split episodes
+    eps_ol = pykoop.split_episodes(
+        dataset['open_loop']['X_train'],
+        episode_feature=dataset['open_loop']['episode_feature'],
+    )
+    eps_cl = pykoop.split_episodes(
+        dataset['closed_loop']['X_train'],
+        episode_feature=dataset['closed_loop']['episode_feature'],
+    )
+    # Create plots
+    fig_d, ax_d = plt.subplots(
+        8,
+        1,
+        constrained_layout=True,
+        sharex=True,
+    )
+    fig_c, ax_c = plt.subplots(
+        1,
+        3,
+        constrained_layout=True,
+        sharex=True,
+    )
+    for (i, X_ol_i), (_, X_cl_i) in zip(eps_ol, eps_cl):
+        # Controller states
+        ax_d[0].plot(X_cl_i[:, 0])
+        ax_d[0].set_ylabel(r'$x_0[k]$')
+        ax_d[1].plot(X_cl_i[:, 1])
+        ax_d[1].set_ylabel(r'$x_1[k]$')
+        # Plant states
+        ax_d[2].plot(X_cl_i[:, 2])
+        ax_d[2].set_ylabel(r'$\theta[k]$')
+        ax_d[3].plot(X_cl_i[:, 3])
+        ax_d[3].set_ylabel(r'$\alpha[k]$')
+        # System inputs
+        ax_d[4].plot(X_cl_i[:, 4])
+        ax_d[4].set_ylabel(r'$r_\theta[k]$')
+        ax_d[5].plot(X_cl_i[:, 5])
+        ax_d[5].set_ylabel(r'$r_\alpha[k]$')
+        ax_d[6].plot(X_cl_i[:, 6])
+        ax_d[6].set_ylabel(r'$f[k]$')
+        # Saturated plant input
+        ax_d[7].plot(X_ol_i[:, 2])
+        ax_d[7].set_ylabel(r'$u[k]$')
+        # Timestep
+        ax_d[7].set_xlabel(r'$k$')
+        # Simulate controller response
+        t = np.arange(X_cl_i.shape[0]) * dataset['t_step']
+        error = np.vstack([
+            X_cl_i[:, 4] - X_cl_i[:, 2],
+            X_cl_i[:, 5] - X_cl_i[:, 3],
+        ])
+        ff = X_cl_i[:, 6]
+        controller = dataset['closed_loop']['controller']
+        t, y, x = control.forced_response(
+            sys=control.StateSpace(*controller, dt=True),
+            T=t,
+            U=error,
+            X0=X_cl_i[0, :controller[0].shape[0]],
+            return_x=True,
+        )
+        # Plot controller response
+        ax_c[0].plot(ff + y[0, :])
+        ax_c[0].set_ylabel(r'Simulated $u[k]$')
+        ax_c[0].set_xlabel(r'$k$')
+        ax_c[1].plot(X_ol_i[:, 2])
+        ax_c[1].set_ylabel(r'Measured $u[k]$')
+        ax_c[1].set_xlabel(r'$k$')
+        ax_c[2].plot(ff + y[0, :] - X_ol_i[:, 2])
+        ax_c[2].set_ylabel(r'$\Delta u[k]$')
+        ax_c[2].set_xlabel(r'$k$')
+    # Save plots
+    pathlib.Path(targets[0]).mkdir(parents=True, exist_ok=True)
+    fig_d.savefig(pathlib.Path(targets[0]).joinpath(f'dataset.png'))
+    fig_c.savefig(pathlib.Path(targets[0]).joinpath(f'controller_output.png'))
+    plt.close(fig_d)
+    plt.close(fig_c)
