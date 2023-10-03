@@ -2,3 +2,4 @@ kp_theta = 6.0
 kd_theta = 1.8
 kp_alpha = 30.0
 kd_alpha = 2.5
+tau = 50.0
