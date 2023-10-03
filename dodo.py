@@ -165,6 +165,6 @@ def action_pickle(dependencies, targets):
         },
     }
     # Save pickle
-    pathlib.Path(targets[0]).parent.mkdir(exist_ok=True)
+    pathlib.Path(targets[0]).parent.mkdir(parents=True, exist_ok=True)
     with open(targets[0], 'wb') as f:
         pickle.dump(output_dict, f)
