@@ -5,3 +5,5 @@ matplotlib==3.8.0
 PICOS==2.4.17
 Mosek==10.1.12
 pykoop==1.2.3
+tomli==2.0.1
+control==0.9.4
