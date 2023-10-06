@@ -2,6 +2,7 @@
 
 import pathlib
 import pickle
+import shutil
 
 import control
 import doit
@@ -44,7 +45,7 @@ def task_plot_pickle():
             'file_dep': [file_dep],
             'task_dep': ['pickle'],
             'targets': [target],
-            'clean': True,
+            'clean': [(shutil.rmtree, [target, True])],
         }
 
 
