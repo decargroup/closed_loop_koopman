@@ -644,11 +644,18 @@ class ClEdmdLeastSquares(KoopmanRegressor):
         B_21 = B_cl[B_c.shape[0]:, :B_c.shape[1]]
         B_22 = B_cl[B_c.shape[0]:, B_c.shape[1]:]
         # Solve for plant's Koopman ``B`` matrix
-        # TODO Test with B_22.shape[1] == 0
-        B_p = scipy.linalg.lstsq(
-            np.hstack([C_c, D_c, np.eye(B_22.shape[1])]).T,
-            np.hstack([A_21, B_21, B_22]).T,
-        )[0].T
+        if B_22.shape[1] != 0:
+            # Feedforward is present
+            B_p = scipy.linalg.lstsq(
+                np.hstack([C_c, D_c, np.eye(B_22.shape[1])]).T,
+                np.hstack([A_21, B_21, B_22]).T,
+            )[0].T
+        else:
+            # No feedforward is present
+            B_p = scipy.linalg.lstsq(
+                np.hstack([C_c, D_c]).T,
+                np.hstack([A_21, B_21]).T,
+            )[0].T
         # Use plant's Koopman ``B`` matrix to solve for ``A``
         A_p = A_22 + (B_p @ D_c @ C_p)
         # Form plant's Koopman matrix and set ``coef_plant_`` for use with
@@ -852,11 +859,17 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
         U_21 = U[n_x_c:, :n_x_c]
         U_22 = U[n_x_c:, n_x_c:(n_x_c + n_x_p)]
         U_23 = U[n_x_c:, (n_x_c + n_x_p):(n_x_c + n_x_p + n_u_c)]
-        U_24 = U[n_x_c:, (n_x_c + n_x_p + n_u_c):]
-        _Q = np.hstack([C_c, D_c, np.eye(C_c.shape[0])])
-        Q = picos.Constant('Q', _Q)
-        # TODO Test with B_22.shape[1] == 0
-        problem.add_constraint(Bp * Q == picos.block([[U_21, U_23, U_24]]))
+        if (n_x_c + n_x_p + n_u_c) < Psi.shape[0]:
+            # Feedforward is present
+            U_24 = U[n_x_c:, (n_x_c + n_x_p + n_u_c):]
+            _Q = np.hstack([C_c, D_c, np.eye(C_c.shape[0])])
+            Q = picos.Constant('Q', _Q)
+            problem.add_constraint(Bp * Q == picos.block([[U_21, U_23, U_24]]))
+        else:
+            # No feedforward is present
+            _Q = np.hstack([C_c, D_c])
+            Q = picos.Constant('Q', _Q)
+            problem.add_constraint(Bp * Q == picos.block([[U_21, U_23]]))
         problem.add_constraint(Ap == U_22 + (Bp * D_c * C_p))
         # Set objective function to minimize slack variable
         problem.set_objective('min', picos.trace(W))
