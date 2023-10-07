@@ -116,8 +116,6 @@ def action_pickle(dependencies, targets):
         theta = data[:, 3]
         alpha = data[:, 4]
         t_step = t[1] - t[0]
-        theta_dot = np.diff(theta, prepend=0) / t_step
-        alpha_dot = np.diff(alpha, prepend=0) / t_step
         v = data[:, 5]
         f = data[:, 6]
         vf = data[:, 7]  # ``v + f`` with saturation
@@ -265,7 +263,7 @@ def action_plot_pickle(dependencies, targets):
         ax_c[2].set_xlabel(r'$k$')
     # Save plots
     pathlib.Path(targets[0]).mkdir(parents=True, exist_ok=True)
-    fig_d.savefig(pathlib.Path(targets[0]).joinpath(f'dataset.png'))
-    fig_c.savefig(pathlib.Path(targets[0]).joinpath(f'controller_output.png'))
+    fig_d.savefig(pathlib.Path(targets[0]).joinpath('dataset.png'))
+    fig_c.savefig(pathlib.Path(targets[0]).joinpath('controller_output.png'))
     plt.close(fig_d)
     plt.close(fig_c)
