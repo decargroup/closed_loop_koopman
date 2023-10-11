@@ -1,11 +1,11 @@
 """Define and automate tasks with ``doit``."""
 
 import pathlib
-import pickle
 import shutil
 
 import control
 import doit
+import joblib
 import numpy as np
 import pykoop
 import tomli
@@ -181,7 +181,7 @@ def action_pickle(dataset_path, pickle_path):
     # Save pickle
     pickle_path.parent.mkdir(parents=True, exist_ok=True)
     with open(pickle_path, 'wb') as f:
-        pickle.dump(output_dict, f)
+        joblib.dump(output_dict, f)
     return True
 
 
@@ -189,7 +189,7 @@ def action_plot_pickle(pickle_path, plot_path):
     """Plot pickled data."""
     # Load pickle
     with open(pickle_path, 'rb') as f:
-        dataset = pickle.load(f)
+        dataset = joblib.load(f)
     # Split episodes
     eps_ol = pykoop.split_episodes(
         dataset['open_loop']['X_train'],
