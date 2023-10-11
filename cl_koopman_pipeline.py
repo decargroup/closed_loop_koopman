@@ -731,7 +731,7 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
                                    np.ndarray]] = None,
         C_plant: Optional[np.ndarray] = None,
         P_Pinv_controller: Optional[Tuple[np.ndarray, np.ndarray]] = None,
-        picos_eps: Optional[int] = 0,
+        picos_eps: Optional[float] = 0,
         solver_params: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Instantiate :class:`ClEdmdConstrainedOpt`.
@@ -752,7 +752,7 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
         P_Pinv_controller: Optional[Tuple[np.ndarray, np.ndarray]],
             Similarity transform for controller state space representation.
             Contains the similarity transform matrix and its inverse.
-        picos_eps : Optional[int]
+        picos_eps : Optional[float]
             Tolerance used for strict LMIs. If nonzero, should be larger than
             solver tolerance.
         solver_params: Optional[Dict[str, Any]]
