@@ -23,11 +23,11 @@ def task_pickle():
     ]
     for (path, name) in datasets:
         dataset = WD.joinpath('dataset').joinpath(path)
-        target = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
+        pickle_ = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
         yield {
             'name': name,
-            'actions': [(action_pickle, [[dataset]])],
-            'targets': [target],
+            'actions': [(action_pickle, (dataset, pickle_))],
+            'targets': [pickle_],
             'uptodate': [doit.tools.check_timestamp_unchanged(str(dataset))],
             'clean': True,
         }
@@ -37,19 +37,18 @@ def task_plot_pickle():
     """Plot pickled data."""
     datasets = ['training_controller', 'test_controller']
     for name in datasets:
-        file_dep = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
-        target = WD.joinpath(f'build/plots/{name}')
+        pickle_ = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
+        plot_dir = WD.joinpath(f'build/plots/{name}')
         yield {
             'name': name,
-            'actions': [action_plot_pickle],
-            'file_dep': [file_dep],
-            'task_dep': ['pickle'],
-            'targets': [target],
-            'clean': [(shutil.rmtree, [target, True])],
+            'actions': [(action_plot_pickle, (pickle_, plot_dir))],
+            'file_dep': [pickle_],
+            'targets': [plot_dir],
+            'clean': [(shutil.rmtree, [plot_dir, True])],
         }
 
 
-def action_pickle(dependencies, targets):
+def action_pickle(dataset_path, pickle_path):
     """Pickle the drive CSV files."""
     # Sampling timestep
     t_step = 1 / 500
@@ -58,8 +57,7 @@ def action_pickle(dependencies, targets):
     # Number of points to skip at the beginning of each episode
     n_skip = 500
     # Parse controller config
-    path = pathlib.Path(dependencies[0])
-    with open(path.joinpath('controller.toml'), 'rb') as f:
+    with open(dataset_path.joinpath('controller.toml'), 'rb') as f:
         gains = tomli.load(f)
     # Set up controller
     derivative = control.TransferFunction(
@@ -108,7 +106,7 @@ def action_pickle(dependencies, targets):
     # Parse CSVs
     episodes_ol = []
     episodes_cl = []
-    for (ep, file) in enumerate(sorted(path.glob('*.csv'))):
+    for (ep, file) in enumerate(sorted(dataset_path.glob('*.csv'))):
         data = np.loadtxt(file, skiprows=1, delimiter=',')
         t = data[:, 0]
         target_theta = data[:, 1]
@@ -116,7 +114,7 @@ def action_pickle(dependencies, targets):
         theta = data[:, 3]
         alpha = data[:, 4]
         t_step = t[1] - t[0]
-        v = data[:, 5]
+        v = data[:, 5]  # noqa: F841
         f = data[:, 6]
         vf = data[:, 7]  # ``v + f`` with saturation
         error = np.vstack([
@@ -181,15 +179,16 @@ def action_pickle(dependencies, targets):
         },
     }
     # Save pickle
-    pathlib.Path(targets[0]).parent.mkdir(parents=True, exist_ok=True)
-    with open(targets[0], 'wb') as f:
+    pickle_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(pickle_path, 'wb') as f:
         pickle.dump(output_dict, f)
+    return True
 
 
-def action_plot_pickle(dependencies, targets):
+def action_plot_pickle(pickle_path, plot_path):
     """Plot pickled data."""
     # Load pickle
-    with open(dependencies[0], 'rb') as f:
+    with open(pickle_path, 'rb') as f:
         dataset = pickle.load(f)
     # Split episodes
     eps_ol = pykoop.split_episodes(
@@ -262,8 +261,9 @@ def action_plot_pickle(dependencies, targets):
         ax_c[2].set_ylabel(r'$\Delta u[k]$')
         ax_c[2].set_xlabel(r'$k$')
     # Save plots
-    pathlib.Path(targets[0]).mkdir(parents=True, exist_ok=True)
-    fig_d.savefig(pathlib.Path(targets[0]).joinpath('dataset.png'))
-    fig_c.savefig(pathlib.Path(targets[0]).joinpath('controller_output.png'))
+    plot_path.mkdir(parents=True, exist_ok=True)
+    fig_d.savefig(plot_path.joinpath('dataset.png'))
+    fig_c.savefig(plot_path.joinpath('controller_output.png'))
     plt.close(fig_d)
     plt.close(fig_c)
+    return True
