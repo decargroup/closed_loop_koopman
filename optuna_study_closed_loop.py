@@ -13,6 +13,7 @@ import cl_koopman_pipeline
 
 def main():
     """Run a closed-loop Optuna study."""
+    # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'pickle_path',
@@ -31,13 +32,11 @@ def main():
         type=int,
     )
     args = parser.parse_args()
+    # Load data
+    dataset = joblib.load(args.pickle_path)
 
     def objective(trial: optuna.Trial) -> float:
         """Implement closed-loop objective function."""
-        # Load data
-        dataset = joblib.load(args.pickle_path)
-        # Create lifting functions
-        lifting_functions = None  # TODO
         # Split data
         gss = sklearn.model_selection.GroupShuffleSplit(
             n_splits=3,
@@ -56,6 +55,8 @@ def main():
             # Train-test split
             X_train_i = dataset['closed_loop']['X_train'][train_index, :]
             X_test_i = dataset['closed_loop']['X_train'][test_index, :]
+            # Create lifting functions
+            lifting_functions = None  # TODO
             # Create pipeline
             kp = cl_koopman_pipeline.ClKoopmanPipeline(
                 lifting_functions=lifting_functions,
