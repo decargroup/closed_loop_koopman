@@ -206,15 +206,13 @@ def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
     }
     # Save pickle
     pickle_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(pickle_path, 'wb') as f:
-        joblib.dump(output_dict, f)
+    joblib.dump(output_dict, pickle_path)
 
 
 def action_plot_pickle(pickle_path: pathlib.Path, plot_path: pathlib.Path):
     """Plot pickled data."""
     # Load pickle
-    with open(pickle_path, 'rb') as f:
-        dataset = joblib.load(f)
+    dataset = joblib.load(pickle_path)
     # Split episodes
     eps_ol = pykoop.split_episodes(
         dataset['open_loop']['X_train'],
@@ -300,18 +298,18 @@ def action_cross_validation(
 ):
     """Run cross-validation."""
     # Load data for all studies
-    with open(pickle_path, 'rb') as f:
-        dataset = joblib.load(f)
+    dataset = joblib.load(pickle_path)
     # Create lifting functions, which are shared for both studies
-    lifting_functions = [
-        (
-            'delay',
-            pykoop.DelayLiftingFn(
-                n_delays_state=1,
-                n_delays_input=1,
-            ),
-        ),
-    ]
+    # lifting_functions = [
+    #     (
+    #         'delay',
+    #         pykoop.DelayLiftingFn(
+    #             n_delays_state=1,
+    #             n_delays_input=1,
+    #         ),
+    #     ),
+    # ]
+    lifting_functions = None  # TODO
 
     def objective_cl(trial: optuna.Trial) -> float:
         """Implement closed-loop objective function."""
@@ -377,7 +375,7 @@ def action_cross_validation(
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
             # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', 0, 1)
+            alpha = trial.suggest_float('alpha', 10, 100)
             # Train-test split
             X_train_i = dataset['open_loop']['X_train'][train_index, :]
             X_test_i = dataset['open_loop']['X_train'][test_index, :]
@@ -422,10 +420,8 @@ def action_cross_validation(
     )
     study.optimize(
         objective,
-        n_trials=10,  # TODO
-        n_jobs=-1,
-        progress_bar=True,
+        n_trials=2,  # TODO
+        n_jobs=-1,  # TODO
     )
     study_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(study_path, 'wb') as f:
-        joblib.dump(study, f)
+    joblib.dump(study, study_path)
