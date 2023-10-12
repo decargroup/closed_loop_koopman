@@ -309,9 +309,11 @@ def action_cross_validation(
         direction='maximize',
     )
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
+    # Set number of processes
+    n_processes = 4
+    # Set number of trials per process
+    n_trials = 30
     # Spawn processes and wait for them all to complete
-    n_processes = 2  # TODO
-    n_trials = 2  # TODO
     processes = []
     for i in range(n_processes):
         p = subprocess.Popen([

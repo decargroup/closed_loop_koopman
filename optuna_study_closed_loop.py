@@ -54,12 +54,24 @@ def main():
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
             # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', 0, 1)
+            alpha = trial.suggest_float('alpha', low=0, high=100, log=True)
             # Train-test split
             X_train_i = dataset['closed_loop']['X_train'][train_index, :]
             X_test_i = dataset['closed_loop']['X_train'][test_index, :]
             # Create lifting functions
-            lifting_functions = None  # TODO
+            lifting_functions = [
+                (
+                    'poly',
+                    pykoop.PolynomialLiftingFn(order=2),
+                ),
+                (
+                    'delay',
+                    pykoop.DelayLiftingFn(
+                        n_delays_state=10,
+                        n_delays_input=10,
+                    ),
+                ),
+            ]
             # Create pipeline
             kp = cl_koopman_pipeline.ClKoopmanPipeline(
                 lifting_functions=lifting_functions,
