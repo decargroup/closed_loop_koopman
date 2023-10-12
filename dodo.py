@@ -7,16 +7,27 @@ import control
 import doit
 import joblib
 import numpy as np
+import optuna
 import pykoop
+import sklearn.model_selection
 import tomli
 from matplotlib import pyplot as plt
+
+import cl_koopman_pipeline
+
+# Have ``pykoop`` skip validation for performance improvements
+pykoop.set_config(skip_validation=True)
 
 # Directory containing ``dodo.py``
 WD = pathlib.Path(__file__).parent.resolve()
 
+# Random seeds
+OPTUNA_TPE_SEED = 3501
+SKLEARN_SPLIT_SEED = 1234
+
 
 def task_pickle():
-    """Pickle the raw CSV files."""
+    """Pickle raw CSV files."""
     datasets = [
         ('controller_20230828', 'training_controller'),
         ('controller_20230915', 'test_controller'),
@@ -48,8 +59,23 @@ def task_plot_pickle():
         }
 
 
-def action_pickle(dataset_path, pickle_path):
-    """Pickle the drive CSV files."""
+def task_cross_validation():
+    """Run cross-validation."""
+    pickle_ = WD.joinpath('build/pickled/dataset_training_controller.pickle')
+    for study_type in ['closed_loop', 'open_loop']:
+        study = WD.joinpath(f'build/studies/{study_type}.pickle')
+        yield {
+            'name': study_type,
+            'actions':
+            [(action_cross_validation, (pickle_, study, study_type))],
+            'file_dep': [pickle_],
+            'targets': [study],
+            'clean': True,
+        }
+
+
+def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
+    """Pickle raw CSV files."""
     # Sampling timestep
     t_step = 1 / 500
     # Number of validation episodes
@@ -182,10 +208,9 @@ def action_pickle(dataset_path, pickle_path):
     pickle_path.parent.mkdir(parents=True, exist_ok=True)
     with open(pickle_path, 'wb') as f:
         joblib.dump(output_dict, f)
-    return True
 
 
-def action_plot_pickle(pickle_path, plot_path):
+def action_plot_pickle(pickle_path: pathlib.Path, plot_path: pathlib.Path):
     """Plot pickled data."""
     # Load pickle
     with open(pickle_path, 'rb') as f:
@@ -266,4 +291,138 @@ def action_plot_pickle(pickle_path, plot_path):
     fig_c.savefig(plot_path.joinpath('controller_output.png'))
     plt.close(fig_d)
     plt.close(fig_c)
-    return True
+
+
+def action_cross_validation(
+    pickle_path: pathlib.Path,
+    study_path: pathlib.Path,
+    study_type: str,
+):
+    """Run cross-validation."""
+    # Load data for all studies
+    with open(pickle_path, 'rb') as f:
+        dataset = joblib.load(f)
+    # Create lifting functions, which are shared for both studies
+    lifting_functions = [
+        (
+            'delay',
+            pykoop.DelayLiftingFn(
+                n_delays_state=1,
+                n_delays_input=1,
+            ),
+        ),
+    ]
+
+    def objective_cl(trial: optuna.Trial) -> float:
+        """Implement closed-loop objective function."""
+        # Split data
+        gss = sklearn.model_selection.GroupShuffleSplit(
+            n_splits=3,
+            test_size=0.2,
+            random_state=SKLEARN_SPLIT_SEED,
+        )
+        gss_iter = gss.split(
+            dataset['closed_loop']['X_train'],
+            groups=dataset['closed_loop']['X_train'][:, 0],
+        )
+        # Run cross-validation
+        r2 = []
+        for i, (train_index, test_index) in enumerate(gss_iter):
+            # Get hyperparameters from Optuna
+            alpha = trial.suggest_float('alpha', 0, 1)
+            # Train-test split
+            X_train_i = dataset['closed_loop']['X_train'][train_index, :]
+            X_test_i = dataset['closed_loop']['X_train'][test_index, :]
+            # Create pipeline
+            kp = cl_koopman_pipeline.ClKoopmanPipeline(
+                lifting_functions=lifting_functions,
+                regressor=cl_koopman_pipeline.ClEdmdLeastSquares(alpha=alpha),
+                controller=dataset['closed_loop']['controller'],
+                C_plant=dataset['closed_loop']['C_plant'],
+            )
+            # Fit model
+            kp.fit(
+                X_train_i,
+                n_inputs=dataset['closed_loop']['n_inputs'],
+                episode_feature=dataset['closed_loop']['episode_feature'],
+            )
+            # Predict closed-loop trajectory
+            X_pred = kp.predict_trajectory(X_test_i)
+            # Score closed-loop trajectory
+            r2_i = pykoop.score_trajectory(
+                X_pred,
+                X_test_i[:, :X_pred.shape[1]],
+                regression_metric='r2',
+            )
+            r2.append(r2_i)
+            trial.report(r2_i, step=i)
+            # Check if trial should be pruned
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+        return np.mean(r2)
+
+    def objective_ol(trial: optuna.Trial) -> float:
+        """Implement open-loop objective function."""
+        # Split data
+        gss = sklearn.model_selection.GroupShuffleSplit(
+            n_splits=3,
+            test_size=0.2,
+            random_state=SKLEARN_SPLIT_SEED,
+        )
+        gss_iter = gss.split(
+            dataset['open_loop']['X_train'],
+            groups=dataset['open_loop']['X_train'][:, 0],
+        )
+        # Run cross-validation
+        r2 = []
+        for i, (train_index, test_index) in enumerate(gss_iter):
+            # Get hyperparameters from Optuna
+            alpha = trial.suggest_float('alpha', 0, 1)
+            # Train-test split
+            X_train_i = dataset['open_loop']['X_train'][train_index, :]
+            X_test_i = dataset['open_loop']['X_train'][test_index, :]
+            # Create pipeline
+            kp = pykoop.KoopmanPipeline(
+                lifting_functions=lifting_functions,
+                regressor=pykoop.Edmd(alpha=alpha),
+            )
+            # Fit model
+            kp.fit(
+                X_train_i,
+                n_inputs=dataset['open_loop']['n_inputs'],
+                episode_feature=dataset['open_loop']['episode_feature'],
+            )
+            # Predict open-loop trajectory
+            X_pred = kp.predict_trajectory(X_test_i)
+            # Score open-loop trajectory
+            r2_i = pykoop.score_trajectory(
+                X_pred,
+                X_test_i[:, :X_pred.shape[1]],
+                regression_metric='r2',
+            )
+            r2.append(r2_i)
+            trial.report(r2_i, step=i)
+            # Check if trial should be pruned
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+        return np.mean(r2)
+
+    if study_type == 'closed_loop':
+        objective = objective_cl
+    elif study_type == 'open_loop':
+        objective = objective_ol
+    else:
+        raise ValueError("`study_type` must be 'closed_loop' or 'open_loop'.")
+
+    study = optuna.create_study(
+        sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
+        pruner=optuna.pruners.ThresholdPruner(lower=-10),
+        study_name=study_type,
+        direction='maximize',
+    )
+    study.optimize(
+        objective,
+        n_trials=100,
+        n_jobs=-1,
+    )
+    joblib.dump(study, study_path)
