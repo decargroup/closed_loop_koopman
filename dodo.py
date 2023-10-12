@@ -141,7 +141,7 @@ def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
         alpha = data[:, 4]
         t_step = t[1] - t[0]
         v = data[:, 5]  # noqa: F841
-        f = data[:, 6]
+        ff = data[:, 6]
         vf = data[:, 7]  # ``v + f`` with saturation
         error = np.vstack([
             target_theta - theta,
@@ -164,7 +164,7 @@ def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
             alpha,
             target_theta,
             target_alpha,
-            f,
+            ff,
         ]).T
         episodes_ol.append((ep, X_ep_ol[n_skip:, :]))
         episodes_cl.append((ep, X_ep_cl[n_skip:, :]))
@@ -422,7 +422,10 @@ def action_cross_validation(
     )
     study.optimize(
         objective,
-        n_trials=100,
+        n_trials=10,  # TODO
         n_jobs=-1,
+        progress_bar=True,
     )
-    joblib.dump(study, study_path)
+    study_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(study_path, 'wb') as f:
+        joblib.dump(study, f)
