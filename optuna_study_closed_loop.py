@@ -75,7 +75,11 @@ def main():
             # Create pipeline
             kp = cl_koopman_pipeline.ClKoopmanPipeline(
                 lifting_functions=lifting_functions,
-                regressor=cl_koopman_pipeline.ClEdmdLeastSquares(alpha=alpha),
+                regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+                    alpha=alpha,
+                    picos_eps=1e-6,
+                    solver_params={'solver': 'mosek'},
+                ),
                 controller=dataset['closed_loop']['controller'],
                 C_plant=dataset['closed_loop']['C_plant'],
             )
