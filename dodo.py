@@ -2,7 +2,6 @@
 
 import pathlib
 import shutil
-import sqlite3
 import subprocess
 
 import control
@@ -296,17 +295,10 @@ def action_cross_validation(
     study_type: str,
 ):
     """Run cross-validation."""
-    # Delete dataase if it exists
+    # Delete database file if it exists
     study_path.unlink(missing_ok=True)
     # Create directory for database if it does not already exist
     study_path.parent.mkdir(parents=True, exist_ok=True)
-    # Create new database file in the directory
-    connection = None
-    try:
-        connection = sqlite3.connect(study_path)
-    finally:
-        if connection:
-            connection.close()
     # Create study and run optimization
     storage_url = f'sqlite:///{study_path.resolve()}'
     optuna.create_study(
