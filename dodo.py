@@ -3,6 +3,7 @@
 import pathlib
 import shutil
 import sqlite3
+import subprocess
 
 import control
 import doit
@@ -10,11 +11,8 @@ import joblib
 import numpy as np
 import optuna
 import pykoop
-import sklearn.model_selection
 import tomli
 from matplotlib import pyplot as plt
-
-import cl_koopman_pipeline
 
 # Have ``pykoop`` skip validation for performance improvements
 pykoop.set_config(skip_validation=True)
@@ -298,114 +296,6 @@ def action_cross_validation(
     study_type: str,
 ):
     """Run cross-validation."""
-    # Load data for all studies
-    dataset = joblib.load(pickle_path)
-    # Create lifting functions, which are shared for both studies
-    # lifting_functions = [
-    #     (
-    #         'delay',
-    #         pykoop.DelayLiftingFn(
-    #             n_delays_state=1,
-    #             n_delays_input=1,
-    #         ),
-    #     ),
-    # ]
-    lifting_functions = None  # TODO
-
-    def objective_cl(trial: optuna.Trial) -> float:
-        """Implement closed-loop objective function."""
-        # Split data
-        gss = sklearn.model_selection.GroupShuffleSplit(
-            n_splits=3,
-            test_size=0.2,
-            random_state=SKLEARN_SPLIT_SEED,
-        )
-        gss_iter = gss.split(
-            dataset['closed_loop']['X_train'],
-            groups=dataset['closed_loop']['X_train'][:, 0],
-        )
-        # Run cross-validation
-        r2 = []
-        for i, (train_index, test_index) in enumerate(gss_iter):
-            # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', 0, 1)
-            # Train-test split
-            X_train_i = dataset['closed_loop']['X_train'][train_index, :]
-            X_test_i = dataset['closed_loop']['X_train'][test_index, :]
-            # Create pipeline
-            kp = cl_koopman_pipeline.ClKoopmanPipeline(
-                lifting_functions=lifting_functions,
-                regressor=cl_koopman_pipeline.ClEdmdLeastSquares(alpha=alpha),
-                controller=dataset['closed_loop']['controller'],
-                C_plant=dataset['closed_loop']['C_plant'],
-            )
-            # Fit model
-            kp.fit(
-                X_train_i,
-                n_inputs=dataset['closed_loop']['n_inputs'],
-                episode_feature=dataset['closed_loop']['episode_feature'],
-            )
-            # Predict closed-loop trajectory
-            X_pred = kp.predict_trajectory(X_test_i)
-            # Score closed-loop trajectory
-            r2_i = pykoop.score_trajectory(
-                X_pred,
-                X_test_i[:, :X_pred.shape[1]],
-                regression_metric='r2',
-            )
-            r2.append(r2_i)
-            trial.report(r2_i, step=i)
-            # Check if trial should be pruned
-            if trial.should_prune():
-                raise optuna.TrialPruned()
-        return np.mean(r2)
-
-    def objective_ol(trial: optuna.Trial) -> float:
-        """Implement open-loop objective function."""
-        # Split data
-        gss = sklearn.model_selection.GroupShuffleSplit(
-            n_splits=3,
-            test_size=0.2,
-            random_state=SKLEARN_SPLIT_SEED,
-        )
-        gss_iter = gss.split(
-            dataset['open_loop']['X_train'],
-            groups=dataset['open_loop']['X_train'][:, 0],
-        )
-        # Run cross-validation
-        r2 = []
-        for i, (train_index, test_index) in enumerate(gss_iter):
-            # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', 10, 100)
-            # Train-test split
-            X_train_i = dataset['open_loop']['X_train'][train_index, :]
-            X_test_i = dataset['open_loop']['X_train'][test_index, :]
-            # Create pipeline
-            kp = pykoop.KoopmanPipeline(
-                lifting_functions=lifting_functions,
-                regressor=pykoop.Edmd(alpha=alpha),
-            )
-            # Fit model
-            kp.fit(
-                X_train_i,
-                n_inputs=dataset['open_loop']['n_inputs'],
-                episode_feature=dataset['open_loop']['episode_feature'],
-            )
-            # Predict open-loop trajectory
-            X_pred = kp.predict_trajectory(X_test_i)
-            # Score open-loop trajectory
-            r2_i = pykoop.score_trajectory(
-                X_pred,
-                X_test_i[:, :X_pred.shape[1]],
-                regression_metric='r2',
-            )
-            r2.append(r2_i)
-            trial.report(r2_i, step=i)
-            # Check if trial should be pruned
-            if trial.should_prune():
-                raise optuna.TrialPruned()
-        return np.mean(r2)
-
     # Delete dataase if it exists
     study_path.unlink(missing_ok=True)
     # Create directory for database if it does not already exist
@@ -417,23 +307,31 @@ def action_cross_validation(
     finally:
         if connection:
             connection.close()
-    # Set objectice function
-    if study_type == 'closed_loop':
-        objective = objective_cl
-    elif study_type == 'open_loop':
-        objective = objective_ol
-    else:
-        raise ValueError("`study_type` must be 'closed_loop' or 'open_loop'.")
     # Create study and run optimization
-    study = optuna.create_study(
-        storage=f'sqlite:///{study_path.resolve()}',
+    storage_url = f'sqlite:///{study_path.resolve()}'
+    optuna.create_study(
+        storage=storage_url,
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
         pruner=optuna.pruners.ThresholdPruner(lower=-10),
         study_name=study_type,
         direction='maximize',
     )
-    study.optimize(
-        objective,
-        n_trials=2,  # TODO
-        n_jobs=-1,  # TODO
-    )
+    script_path = WD.joinpath(f'optuna_study_{study_type}.py')
+    # Spawn processes and wait for them all to complete
+    n_processes = 2
+    n_trials = 2
+    processes = []
+    for i in range(n_processes):
+        p = subprocess.Popen([
+            'python',
+            script_path.resolve(),
+            pickle_path.resolve(),
+            storage_url,
+            str(n_trials),
+            str(SKLEARN_SPLIT_SEED),
+        ])
+        processes.append(p)
+    for p in processes:
+        return_code = p.wait()
+        if return_code < 0:
+            raise RuntimeError(f'Process {p.pid} returned code {return_code}.')
