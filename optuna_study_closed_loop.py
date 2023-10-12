@@ -10,6 +10,9 @@ import sklearn.model_selection
 
 import cl_koopman_pipeline
 
+# Have ``pykoop`` skip validation for performance improvements
+pykoop.set_config(skip_validation=True)
+
 
 def main():
     """Run a closed-loop Optuna study."""

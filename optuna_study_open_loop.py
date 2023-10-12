@@ -8,6 +8,9 @@ import optuna
 import pykoop
 import sklearn.model_selection
 
+# Have ``pykoop`` skip validation for performance improvements
+pykoop.set_config(skip_validation=True)
+
 
 def main():
     """Run an open-loop Optuna study."""
