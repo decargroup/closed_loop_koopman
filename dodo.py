@@ -2,6 +2,7 @@
 
 import pathlib
 import shutil
+import sqlite3
 
 import control
 import doit
@@ -63,7 +64,7 @@ def task_cross_validation():
     """Run cross-validation."""
     pickle_ = WD.joinpath('build/pickled/dataset_training_controller.pickle')
     for study_type in ['closed_loop', 'open_loop']:
-        study = WD.joinpath(f'build/studies/{study_type}.pickle')
+        study = WD.joinpath(f'build/studies/{study_type}.db')
         yield {
             'name': study_type,
             'actions':
@@ -405,14 +406,27 @@ def action_cross_validation(
                 raise optuna.TrialPruned()
         return np.mean(r2)
 
+    # Delete dataase if it exists
+    study_path.unlink(missing_ok=True)
+    # Create directory for database if it does not already exist
+    study_path.parent.mkdir(parents=True, exist_ok=True)
+    # Create new database file in the directory
+    connection = None
+    try:
+        connection = sqlite3.connect(study_path)
+    finally:
+        if connection:
+            connection.close()
+    # Set objectice function
     if study_type == 'closed_loop':
         objective = objective_cl
     elif study_type == 'open_loop':
         objective = objective_ol
     else:
         raise ValueError("`study_type` must be 'closed_loop' or 'open_loop'.")
-
+    # Create study and run optimization
     study = optuna.create_study(
+        storage=f'sqlite:///{study_path.resolve()}',
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
         pruner=optuna.pruners.ThresholdPruner(lower=-10),
         study_name=study_type,
@@ -423,5 +437,3 @@ def action_cross_validation(
         n_trials=2,  # TODO
         n_jobs=-1,  # TODO
     )
-    study_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(study, study_path)
