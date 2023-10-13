@@ -310,7 +310,7 @@ def action_cross_validation(
     )
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
     # Set number of processes
-    n_processes = 4
+    n_processes = 6
     # Set number of trials per process
     n_trials = 30
     # Spawn processes and wait for them all to complete
