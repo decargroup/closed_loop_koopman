@@ -176,18 +176,21 @@ class ClKoopmanPipeline(KoopmanPipeline):
             If constructor or fit parameters are incorrect.
         """
         # Force ``regressor.controller`` to be consistent with pipeline
-        if self.regressor.controller is not None:
-            log.warning('Setting `regressor.controller` to pipeline value')
-        self.regressor.controller = self.controller
+        if hasattr(self.regressor, 'controller'):
+            if self.regressor.controller is not None:
+                log.warning('Setting `regressor.controller` to pipeline value')
+            self.regressor.controller = self.controller
         # Force ``regressor.P_Pinv_controller`` to be consistent with pipeline
-        if self.regressor.P_Pinv_controller is not None:
-            log.warning('Setting `regressor.P_Pinv_controller` to pipeline '
-                        'value')
-        self.regressor.P_Pinv_controller = self.P_Pinv_controller
+        if hasattr(self.regressor, 'P_Pinv_controller'):
+            if self.regressor.P_Pinv_controller is not None:
+                log.warning(
+                    'Setting `regressor.P_Pinv_controller` to pipeline value')
+            self.regressor.P_Pinv_controller = self.P_Pinv_controller
         # Force ``regressor.C_plant`` to be consistent with pipeline
-        if self.regressor.C_plant is not None:
-            log.warning('Setting `regressor.C_plant to pipeline value')
-        self.regressor.C_plant = self.C_plant
+        if hasattr(self.regressor, 'C_plant'):
+            if self.regressor.C_plant is not None:
+                log.warning('Setting `regressor.C_plant to pipeline value')
+            self.regressor.C_plant = self.C_plant
         # Check controller
         if self.controller is None:
             raise ValueError('`controller` must not be `None`.')
@@ -223,37 +226,37 @@ class ClKoopmanPipeline(KoopmanPipeline):
             n_inputs=n_inputs,
             episode_feature=episode_feature,
         )
-        # Make sure closed-loop regressor provides plant Koopman matrix
-        if not hasattr(self.regressor_, 'coef_plant_'):
-            raise ValueError(
-                '`regressor` must provide `coef_plant_` after fit.')
-        # Create new Koopman pipeline where only input is lifted and where
-        # the Koopman matrix has been pre-computed.
-        self.kp_plant_ = pykoop.KoopmanPipeline(
-            lifting_functions=[(
-                'split',
-                pykoop.SplitPipeline(
-                    lifting_functions_state=self.lifting_functions,
-                    lifting_functions_input=None,
-                ),
-            )],
-            regressor=pykoop.DataRegressor(self.regressor_.coef_plant_),
-        )
-        # Convert the closed-loop system's state and input to the plant's
-        # state and input.
-        X_plant = self.closed_loop_to_plant_data(X)
-        self.kp_plant_.fit(
-            X_plant,
-            n_inputs=self.controller_[2].shape[0],
-            episode_feature=self.episode_feature_,
-        )
-        # Copy the pre-fit lifting functions from the closed-loop model into
-        # the plant pipeline. This step ensures that the state-dependent
-        # lifting functions are exactly the same as the ones in the closed-loop
-        # model, instead of being statistical clones. This prevents bugs when
-        # the user does not set ``random_state`` in the lifting functions.
-        self.kp_plant_.lifting_functions_[0][1].lifting_functions_state_ \
-            = self.lifting_functions_plant_
+        # If closed-loop regressor provides plant Koopman matrix, create a
+        # Koopman pipeline for it.
+        if hasattr(self.regressor_, 'coef_plant_'):
+            # Create new Koopman pipeline where only input is lifted and where
+            # the Koopman matrix has been pre-computed.
+            self.kp_plant_ = pykoop.KoopmanPipeline(
+                lifting_functions=[(
+                    'split',
+                    pykoop.SplitPipeline(
+                        lifting_functions_state=self.lifting_functions,
+                        lifting_functions_input=None,
+                    ),
+                )],
+                regressor=pykoop.DataRegressor(self.regressor_.coef_plant_),
+            )
+            # Convert the closed-loop system's state and input to the plant's
+            # state and input.
+            X_plant = self.closed_loop_to_plant_data(X)
+            self.kp_plant_.fit(
+                X_plant,
+                n_inputs=self.controller_[2].shape[0],
+                episode_feature=self.episode_feature_,
+            )
+            # Copy the pre-fit lifting functions from the closed-loop model
+            # into the plant pipeline. This step ensures that the
+            # state-dependent lifting functions are exactly the same as the
+            # ones in the closed-loop model, instead of being statistical
+            # clones. This prevents bugs when the user does not set
+            # ``random_state`` in the lifting functions.
+            self.kp_plant_.lifting_functions_[0][1].lifting_functions_state_ \
+                = self.lifting_functions_plant_
         return self
 
     def fit_transformers(
