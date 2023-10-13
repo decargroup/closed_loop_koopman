@@ -13,6 +13,8 @@ import pykoop
 import tomli
 from matplotlib import pyplot as plt
 
+import cl_koopman_pipeline
+
 # Have ``pykoop`` skip validation for performance improvements
 pykoop.set_config(skip_validation=True)
 
@@ -32,15 +34,18 @@ def task_preprocess_experiments():
     ]
     for (path, name) in datasets:
         dataset = WD.joinpath('dataset').joinpath(path)
-        pickle_ = WD.joinpath(
+        experiment = WD.joinpath(
             'build',
             'experiments',
             f'dataset_{name}.pickle',
         )
         yield {
             'name': name,
-            'actions': [(action_preprocess_experiments, (dataset, pickle_))],
-            'targets': [pickle_],
+            'actions': [(action_preprocess_experiments, (
+                dataset,
+                experiment,
+            ))],
+            'targets': [experiment],
             'uptodate': [doit.tools.check_timestamp_unchanged(str(dataset))],
             'clean': True,
         }
@@ -50,12 +55,16 @@ def task_plot_experiments():
     """Plot pickled data."""
     datasets = ['training_controller', 'test_controller']
     for name in datasets:
-        pickle_ = WD.joinpath('build', 'experiments', f'dataset_{name}.pickle')
+        experiment = WD.joinpath(
+            'build',
+            'experiments',
+            f'dataset_{name}.pickle',
+        )
         plot_dir = WD.joinpath('build', 'plots', name)
         yield {
             'name': name,
-            'actions': [(action_plot_experiments, (pickle_, plot_dir))],
-            'file_dep': [pickle_],
+            'actions': [(action_plot_experiments, (experiment, plot_dir))],
+            'file_dep': [experiment],
             'targets': [plot_dir],
             'clean': [(shutil.rmtree, [plot_dir, True])],
         }
@@ -63,25 +72,58 @@ def task_plot_experiments():
 
 def task_run_cross_validation():
     """Run cross-validation."""
-    pickle_ = WD.joinpath(
-        'build', 'experiments', 'dataset_training_controller.pickle')
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'dataset_training_controller.pickle',
+    )
     for study_type in ['closed_loop', 'open_loop']:
         study = WD.joinpath('build', 'studies', f'{study_type}.db')
         yield {
             'name':
             study_type,
             'actions':
-            [(action_run_cross_validation, (pickle_, study, study_type))],
-            'file_dep': [pickle_],
+            [(action_run_cross_validation, (experiment, study, study_type))],
+            'file_dep': [experiment],
             'targets': [study],
             'clean':
             True,
         }
 
 
+def task_evaluate_models():
+    """Evaluate cross-validation results."""
+    study_cl = WD.joinpath('build', 'studies', 'closed_loop.db')
+    study_ol = WD.joinpath('build', 'studies', 'open_loop.db')
+    experiment_training_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'dataset_training_controller.pickle',
+    )
+    experiment_test_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'dataset_test_controller.pickle',
+    )
+    results = WD.joinpath('build', 'results', 'results.pickle')
+    return {
+        'actions': [(action_evaluate_models, (
+            study_cl,
+            study_ol,
+            experiment_training_controller,
+            experiment_test_controller,
+            results,
+        ))],
+        'file_dep': [study_cl, study_ol],
+        'targets': [results],
+        'clean':
+        True,
+    }
+
+
 def action_preprocess_experiments(
     dataset_path: pathlib.Path,
-    pickle_path: pathlib.Path,
+    experiment_path: pathlib.Path,
 ):
     """Pickle raw CSV files."""
     # Sampling timestep
@@ -213,17 +255,17 @@ def action_preprocess_experiments(
         },
     }
     # Save pickle
-    pickle_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(output_dict, pickle_path)
+    experiment_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(output_dict, experiment_path)
 
 
 def action_plot_experiments(
-    pickle_path: pathlib.Path,
+    experiment_path: pathlib.Path,
     plot_path: pathlib.Path,
 ):
     """Plot pickled data."""
     # Load pickle
-    dataset = joblib.load(pickle_path)
+    dataset = joblib.load(experiment_path)
     # Split episodes
     eps_ol = pykoop.split_episodes(
         dataset['open_loop']['X_train'],
@@ -303,7 +345,7 @@ def action_plot_experiments(
 
 
 def action_run_cross_validation(
-    pickle_path: pathlib.Path,
+    experiment_path: pathlib.Path,
     study_path: pathlib.Path,
     study_type: str,
 ):
@@ -332,7 +374,7 @@ def action_run_cross_validation(
         p = subprocess.Popen([
             'python',
             script_path.resolve(),
-            pickle_path.resolve(),
+            experiment_path.resolve(),
             storage_url,
             str(n_trials),
             str(SKLEARN_SPLIT_SEED),
@@ -342,3 +384,74 @@ def action_run_cross_validation(
         return_code = p.wait()
         if return_code < 0:
             raise RuntimeError(f'Process {p.pid} returned code {return_code}.')
+
+
+def action_evaluate_models(
+    study_path_cl: pathlib.Path,
+    study_path_ol: pathlib.Path,
+    experiment_path_training_controller: pathlib.Path,
+    experiment_path_test_controller: pathlib.Path,
+    results_path: pathlib.Path,
+):
+    """Evaluate cross-validation results."""
+    # Load studies
+    study_cl = optuna.load_study(
+        study_name='closed_loop',
+        storage=f'sqlite:///{study_path_cl.resolve()}',
+    )
+    study_ol = optuna.load_study(
+        study_name='open_loop',
+        storage=f'sqlite:///{study_path_ol.resolve()}',
+    )
+    # Load datasets
+    exp_train = joblib.load(experiment_path_training_controller)
+    exp_test = joblib.load(experiment_path_test_controller)
+    # Set shared lifting functions
+    lifting_functions = [  # TODO Avoid duplication 3x by saving pickle
+        (
+            'poly',
+            pykoop.PolynomialLiftingFn(order=2),
+        ),
+        (
+            'delay',
+            pykoop.DelayLiftingFn(
+                n_delays_state=10,
+                n_delays_input=10,
+            ),
+        ),
+    ]
+    # Re-fit closed-loop model with all data
+    kp_cl = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lifting_functions,
+        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+            alpha=study_cl.best_params['alpha'],
+            picos_eps=1e-6,
+            solver_params={'solver': 'mosek'},
+        ),
+        controller=exp_train['closed_loop']['controller'],
+        C_plant=exp_train['closed_loop']['C_plant'],
+    )
+    kp_cl.fit(
+        exp_train['closed_loop']['X_train'],
+        n_inputs=exp_train['closed_loop']['n_inputs'],
+        episode_feature=exp_train['closed_loop']['episode_feature'],
+    )
+    # Re-fit open-loop model with all data
+    kp_ol = pykoop.KoopmanPipeline(
+        lifting_functions=lifting_functions,
+        regressor=pykoop.Edmd(alpha=study_ol.best_params['alpha']),
+    )
+    # Fit model
+    kp_ol.fit(
+        exp_train['open_loop']['X_train'],
+        n_inputs=exp_train['open_loop']['n_inputs'],
+        episode_feature=exp_train['open_loop']['episode_feature'],
+    )
+    # Change controller in closed-loop model
+    # TODO
+    # Add controller to open-loop model
+    # TODO
+
+    # Save results
+    # results_path.parent.mkdir(parents=True, exist_ok=True)
+    # joblib.dump(None, results_path)  # TODO
