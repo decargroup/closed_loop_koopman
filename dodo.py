@@ -32,7 +32,11 @@ def task_preprocess_experiments():
     ]
     for (path, name) in datasets:
         dataset = WD.joinpath('dataset').joinpath(path)
-        pickle_ = WD.joinpath(f'build/experiments/dataset_{name}.pickle')
+        pickle_ = WD.joinpath(
+            'build',
+            'experiments',
+            f'dataset_{name}.pickle',
+        )
         yield {
             'name': name,
             'actions': [(action_preprocess_experiments, (dataset, pickle_))],
@@ -46,8 +50,8 @@ def task_plot_experiments():
     """Plot pickled data."""
     datasets = ['training_controller', 'test_controller']
     for name in datasets:
-        pickle_ = WD.joinpath(f'build/experiments/dataset_{name}.pickle')
-        plot_dir = WD.joinpath(f'build/plots/{name}')
+        pickle_ = WD.joinpath('build', 'experiments', f'dataset_{name}.pickle')
+        plot_dir = WD.joinpath('build', 'plots', name)
         yield {
             'name': name,
             'actions': [(action_plot_experiments, (pickle_, plot_dir))],
@@ -59,9 +63,10 @@ def task_plot_experiments():
 
 def task_run_cross_validation():
     """Run cross-validation."""
-    pickle_ = WD.joinpath('build/experiments/dataset_training_controller.pickle')
+    pickle_ = WD.joinpath(
+        'build', 'experiments', 'dataset_training_controller.pickle')
     for study_type in ['closed_loop', 'open_loop']:
-        study = WD.joinpath(f'build/studies/{study_type}.db')
+        study = WD.joinpath('build', 'studies', f'{study_type}.db')
         yield {
             'name':
             study_type,
