@@ -241,7 +241,7 @@ def action_preprocess_experiments(
         't_step': t_step,
         'open_loop': {
             'X_train': X_ol_train,
-            'X_valid': X_ol_valid,
+            'X_valid': X_ol_valid,  # TODO Rename to ``X_test``
             'episode_feature': True,
             'n_inputs': 1,
         },
@@ -517,6 +517,11 @@ def action_evaluate_models(
         n_inputs=exp_train['closed_loop']['n_inputs'],
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
+    # Predict trajectories
+    kp_cl.predict_trajectory(exp_train['closed_loop']['X_valid'])
+    kp_ol.predict_trajectory(exp_train['open_loop']['X_valid'])
+    kp_test_cl.predict_trajectory(exp_test['closed_loop']['X_valid'])
+    kp_test_ol.predict_trajectory(exp_test['closed_loop']['X_valid'])
 
     # Save results
     # results_path.parent.mkdir(parents=True, exist_ok=True)
