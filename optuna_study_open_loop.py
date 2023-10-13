@@ -51,7 +51,7 @@ def main():
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
             # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', low=1e-4, high=1e2, log=True)
+            alpha = trial.suggest_float('alpha', low=1e-3, high=1e3, log=True)
             # Train-test split
             X_train_i = dataset['open_loop']['X_train'][train_index, :]
             X_test_i = dataset['open_loop']['X_train'][test_index, :]
