@@ -24,7 +24,7 @@ OPTUNA_TPE_SEED = 3501
 SKLEARN_SPLIT_SEED = 1234
 
 
-def task_pickle():
+def task_preprocess_experiments():
     """Pickle raw CSV files."""
     datasets = [
         ('controller_20230828', 'training_controller'),
@@ -32,47 +32,52 @@ def task_pickle():
     ]
     for (path, name) in datasets:
         dataset = WD.joinpath('dataset').joinpath(path)
-        pickle_ = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
+        pickle_ = WD.joinpath(f'build/experiments/dataset_{name}.pickle')
         yield {
             'name': name,
-            'actions': [(action_pickle, (dataset, pickle_))],
+            'actions': [(action_preprocess_experiments, (dataset, pickle_))],
             'targets': [pickle_],
             'uptodate': [doit.tools.check_timestamp_unchanged(str(dataset))],
             'clean': True,
         }
 
 
-def task_plot_pickle():
+def task_plot_experiments():
     """Plot pickled data."""
     datasets = ['training_controller', 'test_controller']
     for name in datasets:
-        pickle_ = WD.joinpath(f'build/pickled/dataset_{name}.pickle')
+        pickle_ = WD.joinpath(f'build/experiments/dataset_{name}.pickle')
         plot_dir = WD.joinpath(f'build/plots/{name}')
         yield {
             'name': name,
-            'actions': [(action_plot_pickle, (pickle_, plot_dir))],
+            'actions': [(action_plot_experiments, (pickle_, plot_dir))],
             'file_dep': [pickle_],
             'targets': [plot_dir],
             'clean': [(shutil.rmtree, [plot_dir, True])],
         }
 
 
-def task_cross_validation():
+def task_run_cross_validation():
     """Run cross-validation."""
-    pickle_ = WD.joinpath('build/pickled/dataset_training_controller.pickle')
+    pickle_ = WD.joinpath('build/experiments/dataset_training_controller.pickle')
     for study_type in ['closed_loop', 'open_loop']:
         study = WD.joinpath(f'build/studies/{study_type}.db')
         yield {
-            'name': study_type,
+            'name':
+            study_type,
             'actions':
-            [(action_cross_validation, (pickle_, study, study_type))],
+            [(action_run_cross_validation, (pickle_, study, study_type))],
             'file_dep': [pickle_],
             'targets': [study],
-            'clean': True,
+            'clean':
+            True,
         }
 
 
-def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
+def action_preprocess_experiments(
+    dataset_path: pathlib.Path,
+    pickle_path: pathlib.Path,
+):
     """Pickle raw CSV files."""
     # Sampling timestep
     t_step = 1 / 500
@@ -207,7 +212,10 @@ def action_pickle(dataset_path: pathlib.Path, pickle_path: pathlib.Path):
     joblib.dump(output_dict, pickle_path)
 
 
-def action_plot_pickle(pickle_path: pathlib.Path, plot_path: pathlib.Path):
+def action_plot_experiments(
+    pickle_path: pathlib.Path,
+    plot_path: pathlib.Path,
+):
     """Plot pickled data."""
     # Load pickle
     dataset = joblib.load(pickle_path)
@@ -289,7 +297,7 @@ def action_plot_pickle(pickle_path: pathlib.Path, plot_path: pathlib.Path):
     plt.close(fig_c)
 
 
-def action_cross_validation(
+def action_run_cross_validation(
     pickle_path: pathlib.Path,
     study_path: pathlib.Path,
     study_type: str,
