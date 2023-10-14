@@ -113,7 +113,7 @@ class ClKoopmanPipeline(KoopmanPipeline):
     def __init__(
         self,
         lifting_functions: Optional[List[Tuple[str, KoopmanLiftingFn]]] = None,
-        regressor: KoopmanRegressor = None,
+        regressor: Optional[KoopmanRegressor] = None,
         controller: Optional[Tuple[np.ndarray, np.ndarray, np.ndarray,
                                    np.ndarray]] = None,
         C_plant: Optional[np.ndarray] = None,
@@ -125,7 +125,7 @@ class ClKoopmanPipeline(KoopmanPipeline):
         ----------
         lifting_functions : Optional[List[Tuple[str, KoopmanLiftingFn]]]
             List of names and lifting function objects.
-        regressor : KoopmanRegressor
+        regressor : Optional[KoopmanRegressor]
             Koopman regressor.
         controller : Optional[Tuple[np.ndarray, np.ndarray, np.ndarray,
                                     np.ndarray]]
@@ -515,6 +515,55 @@ class ClKoopmanPipeline(KoopmanPipeline):
         # Re-combine episodes
         X_plant_arr = combine_episodes(X_plant_lst, self.episode_feature_)
         return X_plant_arr
+
+    @staticmethod
+    def from_ol_pipeline(
+        ol_koopman_pipeline: KoopmanPipeline,
+        controller: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        C_plant: np.ndarray,
+    ) -> 'ClKoopmanPipeline':
+        """Create a closed-loop Koopman pipeline from a fit open-loop one.
+
+        Parameters
+        ----------
+        ol_koopman_pipeline : KoopmanPipeline
+            Fit open-loop Koopman pipeline.
+        controller : Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+            State space matrices of the controller.
+        C_plant : np.ndarray
+            Output matrix of the plant, going from the unlifted state to the
+            output. Needs to be multiplied with the matrix that recovers
+            the unlifted state from the lifted state to get the output matrix
+            of the Koopman plant.
+
+        Returns
+        -------
+        ClKoopmanPipeline :
+            Closed-loop Koopman pipeline with specified controller in the loop.
+        """
+        Ac, Bc, Cc, Dc = controller
+        Up = ol_koopman_pipeline.regressor_.coef_.T
+        Ap = Up[:, :Up.shape[0]]
+        Bp = Up[:, Up.shape[0]:]
+        Cp = C_plant @ np.hstack([
+            np.eye(C_plant.shape[1]),
+            np.zeros((
+                C_plant.shape[1],
+                Ap.shape[0] - C_plant.shape[1],
+            )),
+        ])
+        Us = np.block([
+            [Ac, -Bc @ Cp, Bc,
+             np.zeros((Bc.shape[0], Bp.shape[1]))],
+            [Bp @ Cc, Ap - Bp @ Dc @ Cp, Bp @ Dc, Bp],
+        ])
+        kp = ClKoopmanPipeline(
+            lifting_functions=ol_koopman_pipeline.lifting_functions,
+            regressor=pykoop.DataRegressor(coef=Us.T),
+            controller=controller,
+            C_plant=C_plant,
+        )
+        return kp
 
 
 class ClEdmdLeastSquares(KoopmanRegressor):

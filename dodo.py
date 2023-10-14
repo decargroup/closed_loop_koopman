@@ -80,6 +80,7 @@ def task_save_lifting_functions():
     return {
         'actions': [(action_save_lifting_functions, (lf_path, ))],
         'targets': [lf_path],
+        'uptodate': [doit.tools.check_timestamp_unchanged(str(lf_path))],
         'clean': True,
     }
 
@@ -492,30 +493,10 @@ def action_evaluate_models(
         n_inputs=exp_train['open_loop']['n_inputs'],
         episode_feature=exp_train['open_loop']['episode_feature'],
     )
-    # Get test controller state space realization and output matrix
-    Ac, Bc, Cc, Dc = exp_test['closed_loop']['controller']
-    C_plant = exp_test['closed_loop']['C_plant']
-    # Calculate new closed-loop Koopman matrix from the identified Koopman
-    # plant model
-    Up_cl = kp_cl.kp_plant_.regressor_.coef_.T
-    Ap_cl = Up_cl[:, :Up_cl.shape[0]]
-    Bp_cl = Up_cl[:, Up_cl.shape[0]:]
-    Cp_cl = C_plant @ np.hstack([
-        np.eye(C_plant.shape[1]),
-        np.zeros((
-            C_plant.shape[1],
-            kp_cl.n_states_out_ - Bc.shape[0] - C_plant.shape[1],
-        )),
-    ])
-    U_test_cl = np.block([
-        [Ac, -Bc @ Cp_cl, Bc,
-         np.zeros((Bc.shape[0], Bp_cl.shape[1]))],
-        [Bp_cl @ Cc, Ap_cl - Bp_cl @ Dc @ Cp_cl, Bp_cl @ Dc, Bp_cl],
-    ])
-    # Create a closed-loop pipeline with the new Koopman matrix
-    kp_test_cl = cl_koopman_pipeline.ClKoopmanPipeline(
-        lifting_functions=lifting_functions,
-        regressor=pykoop.DataRegressor(coef=U_test_cl.T),
+    # Make a new closed-loop Koopman pipeline by combining the identified
+    # Koopman plant model with a different controller
+    kp_test_cl = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_cl.kp_plant_,
         controller=exp_test['closed_loop']['controller'],
         C_plant=exp_test['closed_loop']['C_plant'],
     )
@@ -527,27 +508,10 @@ def action_evaluate_models(
         n_inputs=exp_train['closed_loop']['n_inputs'],
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
-    # Calculate a closed-loop Koopman matrix by adding a controller to the
-    # open-loop model
-    Up_ol = kp_ol.regressor_.coef_.T
-    Ap_ol = Up_ol[:, :Up_ol.shape[0]]
-    Bp_ol = Up_ol[:, Up_ol.shape[0]:]
-    Cp_ol = C_plant @ np.hstack([
-        np.eye(C_plant.shape[1]),
-        np.zeros((
-            C_plant.shape[1],
-            kp_ol.n_states_out_ - C_plant.shape[1],
-        )),
-    ])
-    U_test_ol = np.block([
-        [Ac, -Bc @ Cp_ol, Bc,
-         np.zeros((Bc.shape[0], Bp_ol.shape[1]))],
-        [Bp_ol @ Cc, Ap_ol - Bp_ol @ Dc @ Cp_ol, Bp_ol @ Dc, Bp_ol],
-    ])
-    # Create a closed-loop pipeline with the new Koopman matrix
-    kp_test_ol = cl_koopman_pipeline.ClKoopmanPipeline(
-        lifting_functions=lifting_functions,
-        regressor=pykoop.DataRegressor(coef=U_test_ol.T),
+    # Make a new closed-loop Koopman pipeline by combining the open-loop
+    # Koopman model with a different controller
+    kp_test_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_ol,
         controller=exp_test['closed_loop']['controller'],
         C_plant=exp_test['closed_loop']['C_plant'],
     )
