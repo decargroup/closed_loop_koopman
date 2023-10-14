@@ -19,7 +19,11 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'pickle_path',
+        'experiment_path',
+        type=str,
+    )
+    parser.add_argument(
+        'lifting_functions_path',
         type=str,
     )
     parser.add_argument(
@@ -36,7 +40,9 @@ def main():
     )
     args = parser.parse_args()
     # Load data
-    dataset = joblib.load(args.pickle_path)
+    dataset = joblib.load(args.experiment_path)
+    # Load lifting functions
+    lifting_functions = joblib.load(args.lifting_functions_path)
 
     def objective(trial: optuna.Trial) -> float:
         """Implement closed-loop objective function."""
@@ -58,20 +64,6 @@ def main():
             # Train-test split
             X_train_i = dataset['closed_loop']['X_train'][train_index, :]
             X_test_i = dataset['closed_loop']['X_train'][test_index, :]
-            # Create lifting functions
-            lifting_functions = [
-                (
-                    'poly',
-                    pykoop.PolynomialLiftingFn(order=2),
-                ),
-                (
-                    'delay',
-                    pykoop.DelayLiftingFn(
-                        n_delays_state=10,
-                        n_delays_input=10,
-                    ),
-                ),
-            ]
             # Create pipeline
             kp = cl_koopman_pipeline.ClKoopmanPipeline(
                 lifting_functions=lifting_functions,

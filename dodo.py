@@ -70,6 +70,20 @@ def task_plot_experiments():
         }
 
 
+def task_save_lifting_functions():
+    """Save lifting functions for shared use."""
+    lf_path = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    return {
+        'actions': [(action_save_lifting_functions, (lf_path, ))],
+        'targets': [lf_path],
+        'clean': True,
+    }
+
+
 def task_run_cross_validation():
     """Run cross-validation."""
     experiment = WD.joinpath(
@@ -77,14 +91,23 @@ def task_run_cross_validation():
         'experiments',
         'dataset_training_controller.pickle',
     )
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
     for study_type in ['closed_loop', 'open_loop']:
         study = WD.joinpath('build', 'studies', f'{study_type}.db')
         yield {
             'name':
             study_type,
-            'actions':
-            [(action_run_cross_validation, (experiment, study, study_type))],
-            'file_dep': [experiment],
+            'actions': [(action_run_cross_validation, (
+                experiment,
+                lifting_functions,
+                study,
+                study_type,
+            ))],
+            'file_dep': [experiment, lifting_functions],
             'targets': [study],
             'clean':
             True,
@@ -93,6 +116,11 @@ def task_run_cross_validation():
 
 def task_evaluate_models():
     """Evaluate cross-validation results."""
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
     study_cl = WD.joinpath('build', 'studies', 'closed_loop.db')
     study_ol = WD.joinpath('build', 'studies', 'open_loop.db')
     experiment_training_controller = WD.joinpath(
@@ -108,13 +136,14 @@ def task_evaluate_models():
     results = WD.joinpath('build', 'results', 'results.pickle')
     return {
         'actions': [(action_evaluate_models, (
+            lifting_functions,
             study_cl,
             study_ol,
             experiment_training_controller,
             experiment_test_controller,
             results,
         ))],
-        'file_dep': [study_cl, study_ol],
+        'file_dep': [lifting_functions, study_cl, study_ol],
         'targets': [results],
         'clean':
         True,
@@ -241,13 +270,13 @@ def action_preprocess_experiments(
         't_step': t_step,
         'open_loop': {
             'X_train': X_ol_train,
-            'X_valid': X_ol_valid,  # TODO Rename to ``X_test``
+            'X_test': X_ol_valid,
             'episode_feature': True,
             'n_inputs': 1,
         },
         'closed_loop': {
             'X_train': X_cl_train,
-            'X_valid': X_cl_valid,
+            'X_test': X_cl_valid,
             'n_inputs': 3,
             'episode_feature': True,
             'controller': controller,
@@ -344,8 +373,28 @@ def action_plot_experiments(
     plt.close(fig_c)
 
 
+def action_save_lifting_functions(lifting_function_path: pathlib.Path):
+    """Save lifting functions for shared use."""
+    lifting_functions = [
+        (
+            'poly',
+            pykoop.PolynomialLiftingFn(order=2),
+        ),
+        (
+            'delay',
+            pykoop.DelayLiftingFn(
+                n_delays_state=10,
+                n_delays_input=10,
+            ),
+        ),
+    ]
+    lifting_function_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(lifting_functions, lifting_function_path)
+
+
 def action_run_cross_validation(
     experiment_path: pathlib.Path,
+    lifting_functions_path: pathlib.Path,
     study_path: pathlib.Path,
     study_type: str,
 ):
@@ -375,6 +424,7 @@ def action_run_cross_validation(
             'python',
             script_path.resolve(),
             experiment_path.resolve(),
+            lifting_functions_path.resolve(),
             storage_url,
             str(n_trials),
             str(SKLEARN_SPLIT_SEED),
@@ -387,6 +437,7 @@ def action_run_cross_validation(
 
 
 def action_evaluate_models(
+    lifting_functions_path: pathlib.Path,
     study_path_cl: pathlib.Path,
     study_path_ol: pathlib.Path,
     experiment_path_training_controller: pathlib.Path,
@@ -407,19 +458,7 @@ def action_evaluate_models(
     exp_train = joblib.load(experiment_path_training_controller)
     exp_test = joblib.load(experiment_path_test_controller)
     # Set shared lifting functions
-    lifting_functions = [  # TODO Avoid duplication 3x by saving pickle
-        (
-            'poly',
-            pykoop.PolynomialLiftingFn(order=2),
-        ),
-        (
-            'delay',
-            pykoop.DelayLiftingFn(
-                n_delays_state=10,
-                n_delays_input=10,
-            ),
-        ),
-    ]
+    lifting_functions = joblib.load(lifting_functions_path)
     # Re-fit closed-loop model with all data
     kp_cl = cl_koopman_pipeline.ClKoopmanPipeline(
         lifting_functions=lifting_functions,
@@ -469,7 +508,8 @@ def action_evaluate_models(
         )),
     ])
     U_test_cl = np.block([
-        [Ac, -Bc @ Cp_cl, Bc, np.zeros((Bc.shape[0], Bp_cl.shape[1]))],
+        [Ac, -Bc @ Cp_cl, Bc,
+         np.zeros((Bc.shape[0], Bp_cl.shape[1]))],
         [Bp_cl @ Cc, Ap_cl - Bp_cl @ Dc @ Cp_cl, Bp_cl @ Dc, Bp_cl],
     ])
     # Create a closed-loop pipeline with the new Koopman matrix
@@ -518,10 +558,10 @@ def action_evaluate_models(
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
     # Predict trajectories
-    kp_cl.predict_trajectory(exp_train['closed_loop']['X_valid'])
-    kp_ol.predict_trajectory(exp_train['open_loop']['X_valid'])
-    kp_test_cl.predict_trajectory(exp_test['closed_loop']['X_valid'])
-    kp_test_ol.predict_trajectory(exp_test['closed_loop']['X_valid'])
+    kp_cl.predict_trajectory(exp_train['closed_loop']['X_test'])
+    kp_ol.predict_trajectory(exp_train['open_loop']['X_test'])
+    kp_test_cl.predict_trajectory(exp_test['closed_loop']['X_test'])
+    kp_test_ol.predict_trajectory(exp_test['closed_loop']['X_test'])
 
     # Save results
     # results_path.parent.mkdir(parents=True, exist_ok=True)
