@@ -175,6 +175,8 @@ class ClKoopmanPipeline(KoopmanPipeline):
         ValueError
             If constructor or fit parameters are incorrect.
         """
+        if self.regressor is None:
+            raise ValueError('`regressor` must not be `None`.')
         # Force ``regressor.controller`` to be consistent with pipeline
         if hasattr(self.regressor, 'controller'):
             if self.regressor.controller is not None:

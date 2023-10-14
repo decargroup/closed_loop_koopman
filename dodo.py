@@ -159,7 +159,7 @@ def action_preprocess_experiments(
     # Sampling timestep
     t_step = 1 / 500
     # Number of validation episodes
-    n_valid = 2
+    n_test = 20
     # Number of points to skip at the beginning of each episode
     n_skip = 500
     # Parse controller config
@@ -249,7 +249,7 @@ def action_preprocess_experiments(
         episodes_ol.append((ep, X_ep_ol[n_skip:, :]))
         episodes_cl.append((ep, X_ep_cl[n_skip:, :]))
     # Combine episodes
-    n_train = len(episodes_ol) - n_valid
+    n_train = len(episodes_ol) - n_test
     X_ol_train = pykoop.combine_episodes(
         episodes_ol[:n_train],
         episode_feature=True,
@@ -493,40 +493,71 @@ def action_evaluate_models(
         n_inputs=exp_train['open_loop']['n_inputs'],
         episode_feature=exp_train['open_loop']['episode_feature'],
     )
-    # Make a new closed-loop Koopman pipeline by combining the identified
-    # Koopman plant model with a different controller
-    kp_test_cl = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
-        kp_cl.kp_plant_,
-        controller=exp_test['closed_loop']['controller'],
-        C_plant=exp_test['closed_loop']['C_plant'],
+    # Combine the model found using open-loop ID with the known training
+    # controller
+    kp_train_from_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_ol,
+        controller=exp_train['closed_loop']['controller'],
+        C_plant=exp_train['closed_loop']['C_plant'],
     )
-    # Still fit using ``exp_train`` data, but fit will not change the Koopman
-    # matrix set in ``DataRegressor``, it will just check the dimensions and
-    # fit the lifting functions.
-    kp_test_cl.fit(
+    kp_train_from_ol.fit(
         exp_train['closed_loop']['X_train'],
         n_inputs=exp_train['closed_loop']['n_inputs'],
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
-    # Make a new closed-loop Koopman pipeline by combining the open-loop
-    # Koopman model with a different controller
-    kp_test_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+    # Combine the model found using closed-loop ID with the known test
+    # controller
+    kp_test_from_cl = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_cl.kp_plant_,
+        controller=exp_test['closed_loop']['controller'],
+        C_plant=exp_test['closed_loop']['C_plant'],
+    )
+    # Still fit using ``exp_train`` data. This will not change the Koopman
+    # matrix set in ``DataRegressor``, it will just check the dimensions and
+    # fit the lifting functions.
+    kp_test_from_cl.fit(
+        exp_train['closed_loop']['X_train'],
+        n_inputs=exp_train['closed_loop']['n_inputs'],
+        episode_feature=exp_train['closed_loop']['episode_feature'],
+    )
+    # Combine the model found using open-loop ID with the known test
+    # controller
+    kp_test_from_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
         kp_ol,
         controller=exp_test['closed_loop']['controller'],
         C_plant=exp_test['closed_loop']['C_plant'],
     )
     # Still fit using ``exp_train`` data
-    kp_test_ol.fit(
+    kp_test_from_ol.fit(
         exp_train['closed_loop']['X_train'],
         n_inputs=exp_train['closed_loop']['n_inputs'],
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
-    # Predict trajectories
-    kp_cl.predict_trajectory(exp_train['closed_loop']['X_test'])
-    kp_ol.predict_trajectory(exp_train['open_loop']['X_test'])
-    kp_test_cl.predict_trajectory(exp_test['closed_loop']['X_test'])
-    kp_test_ol.predict_trajectory(exp_test['closed_loop']['X_test'])
-
+    # Predict closed-loop trajectories
+    Xp_train_from_cl = kp_cl.predict_trajectory(
+        exp_train['closed_loop']['X_test'])
+    Xp_train_from_ol = kp_train_from_ol.predict_trajectory(
+        exp_train['closed_loop']['X_test'])
+    Xp_test_from_cl = kp_test_from_cl.predict_trajectory(
+        exp_test['closed_loop']['X_test'])
+    Xp_test_from_ol = kp_test_from_ol.predict_trajectory(
+        exp_test['closed_loop']['X_test'])
+    # Predict open-loop trajectories
+    Xp_train_ol = kp_ol.predict_trajectory(exp_train['open_loop']['X_test'])
+    Xp_test_ol = kp_ol.predict_trajectory(exp_test['open_loop']['X_test'])
     # Save results
-    # results_path.parent.mkdir(parents=True, exist_ok=True)
-    # joblib.dump(None, results_path)  # TODO
+    results = {
+        'Xp_train_from_cl': Xp_train_from_cl,
+        'Xp_train_from_ol': Xp_train_from_ol,
+        'Xp_test_from_cl': Xp_test_from_cl,
+        'Xp_test_from_ol': Xp_test_from_ol,
+        'Xp_train_ol': Xp_train_ol,
+        'Xp_test_ol': Xp_test_ol,
+        'kp_train_from_cl': kp_cl,
+        'kp_train_from_ol': kp_train_from_ol,
+        'kp_test_from_cl': kp_test_from_cl,
+        'kp_test_from_ol': kp_test_from_ol,
+        'kp_ol': kp_ol,
+    }
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(results, results_path)
