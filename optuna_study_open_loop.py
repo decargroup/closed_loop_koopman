@@ -79,6 +79,7 @@ def main():
                 X_pred,
                 X_test_i[:, :X_pred.shape[1]],
                 regression_metric='r2',
+                episode_feature=dataset['open_loop']['episode_feature'],
             )
             r2.append(r2_i)
             trial.report(r2_i, step=i)
