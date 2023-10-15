@@ -115,7 +115,7 @@ def main():
     fig.suptitle('Xp_test')
 
     fig, ax = res['kp_train_from_cl'].kp_plant_.plot_eigenvalues()
-    fig.suptitle('kp_train_from_cl')
+    fig.suptitle('kp_train_ol_from_cl')
     fig, ax = res['kp_ol'].plot_eigenvalues()
     fig.suptitle('kp_ol')
 
