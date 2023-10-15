@@ -534,25 +534,33 @@ def action_evaluate_models(
         episode_feature=exp_train['closed_loop']['episode_feature'],
     )
     # Predict closed-loop trajectories
-    Xp_train_from_cl = kp_cl.predict_trajectory(
+    Xp_train_cl_from_cl = kp_cl.predict_trajectory(
         exp_train['closed_loop']['X_test'])
-    Xp_train_from_ol = kp_train_from_ol.predict_trajectory(
+    Xp_train_cl_from_ol = kp_train_from_ol.predict_trajectory(
         exp_train['closed_loop']['X_test'])
-    Xp_test_from_cl = kp_test_from_cl.predict_trajectory(
+    Xp_test_cl_from_cl = kp_test_from_cl.predict_trajectory(
         exp_test['closed_loop']['X_test'])
-    Xp_test_from_ol = kp_test_from_ol.predict_trajectory(
+    Xp_test_cl_from_ol = kp_test_from_ol.predict_trajectory(
         exp_test['closed_loop']['X_test'])
     # Predict open-loop trajectories
-    Xp_train_ol = kp_ol.predict_trajectory(exp_train['open_loop']['X_test'])
-    Xp_test_ol = kp_ol.predict_trajectory(exp_test['open_loop']['X_test'])
+    Xp_train_ol_from_cl = kp_cl.kp_plant_.predict_trajectory(
+        exp_train['open_loop']['X_test'])
+    Xp_train_ol_from_ol = kp_ol.predict_trajectory(
+        exp_train['open_loop']['X_test'])
+    Xp_test_ol_from_cl = kp_cl.kp_plant_.predict_trajectory(
+        exp_test['open_loop']['X_test'])
+    Xp_test_ol_from_ol = kp_ol.predict_trajectory(
+        exp_test['open_loop']['X_test'])
     # Save results
     results = {
-        'Xp_train_from_cl': Xp_train_from_cl,
-        'Xp_train_from_ol': Xp_train_from_ol,
-        'Xp_test_from_cl': Xp_test_from_cl,
-        'Xp_test_from_ol': Xp_test_from_ol,
-        'Xp_train_ol': Xp_train_ol,
-        'Xp_test_ol': Xp_test_ol,
+        'Xp_train_cl_from_cl': Xp_train_cl_from_cl,
+        'Xp_train_cl_from_ol': Xp_train_cl_from_ol,
+        'Xp_test_cl_from_cl': Xp_test_cl_from_cl,
+        'Xp_test_cl_from_ol': Xp_test_cl_from_ol,
+        'Xp_train_ol_from_cl': Xp_train_ol_from_cl,
+        'Xp_train_ol_from_ol': Xp_train_ol_from_ol,
+        'Xp_test_ol_from_cl': Xp_test_ol_from_cl,
+        'Xp_test_ol_from_ol': Xp_test_ol_from_ol,
         'kp_train_from_cl': kp_cl,
         'kp_train_from_ol': kp_train_from_ol,
         'kp_test_from_cl': kp_test_from_cl,
