@@ -80,7 +80,7 @@ def task_save_lifting_functions():
     return {
         'actions': [(action_save_lifting_functions, (lf_path, ))],
         'targets': [lf_path],
-        'uptodate': [doit.tools.check_timestamp_unchanged(str(lf_path))],
+        'uptodate': [True],
         'clean': True,
     }
 
@@ -134,7 +134,7 @@ def task_evaluate_models():
         'experiments',
         'dataset_test_controller.pickle',
     )
-    results = WD.joinpath('build', 'results', 'results.pickle')
+    results = WD.joinpath('build', 'predictions', 'predictions.pickle')
     return {
         'actions': [(action_evaluate_models, (
             lifting_functions,
