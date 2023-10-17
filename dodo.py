@@ -494,9 +494,11 @@ def action_evaluate_models(
     """Evaluate cross-validation results."""
     # Load studies
     study_cl = optuna.load_study(
+        study_name=None,
         storage=f'sqlite:///{study_path_cl.resolve()}',
     )
     study_ol = optuna.load_study(
+        study_name=None,
         storage=f'sqlite:///{study_path_ol.resolve()}',
     )
     # Load datasets

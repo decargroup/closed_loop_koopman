@@ -98,6 +98,7 @@ def main():
         return np.mean(r2)
 
     study = optuna.load_study(
+        study_name=None,
         storage=args.study_path,
     )
     study.optimize(
