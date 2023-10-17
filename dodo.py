@@ -127,6 +127,7 @@ def task_run_cross_validation():
                     experiment,
                     lifting_functions,
                     study,
+                    lifting_function_type,
                     study_type,
                 ))],
                 'file_dep': [experiment, lifting_functions],
@@ -441,6 +442,7 @@ def action_run_cross_validation(
     experiment_path: pathlib.Path,
     lifting_functions_path: pathlib.Path,
     study_path: pathlib.Path,
+    lifting_function_type: str,
     study_type: str,
 ):
     """Run cross-validation."""
@@ -454,7 +456,7 @@ def action_run_cross_validation(
         storage=storage_url,
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
         pruner=optuna.pruners.ThresholdPruner(lower=-10),
-        study_name=study_type,
+        study_name=f'{lifting_function_type}_{study_type}',
         direction='maximize',
     )
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
