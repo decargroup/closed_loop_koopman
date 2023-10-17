@@ -90,7 +90,7 @@ def task_save_lifting_functions():
         'lifting_functions',
         'lifting_functions.pickle',
     )
-    yield {
+    return {
         'actions': [(action_save_lifting_functions, (lf_path, ))],
         'targets': [lf_path],
         'uptodate': [True],
@@ -163,7 +163,7 @@ def task_evaluate_models():
         'predictions',
         'predictions.pickle',
     )
-    yield {
+    return {
         'actions': [(action_evaluate_models, (
             lifting_functions,
             study_cl,
