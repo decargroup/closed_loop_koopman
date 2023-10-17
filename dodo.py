@@ -73,7 +73,7 @@ def task_plot_experiments():
             'experiments',
             f'dataset_{name}.pickle',
         )
-        plot_dir = WD.joinpath('build', 'plots', name)
+        plot_dir = WD.joinpath('build', 'experiment_plots', name)
         yield {
             'name': name,
             'actions': [(action_plot_experiments, (experiment, plot_dir))],
