@@ -15,14 +15,14 @@ def main():
     experiment_path_training_controller = WD.joinpath(
         'build',
         'experiments',
-        'dataset_training_controller.pickle',
+        'training_controller.pickle',
     )
     experiment_path_test_controller = WD.joinpath(
         'build',
         'experiments',
-        'dataset_test_controller.pickle',
+        'test_controller.pickle',
     )
-    results_path = WD.joinpath('build', 'predictions', 'poly_delay.pickle')
+    results_path = WD.joinpath('build', 'predictions', 'predictions.pickle')
     exp_train = joblib.load(experiment_path_training_controller)
     exp_test = joblib.load(experiment_path_test_controller)
     res = joblib.load(results_path)
