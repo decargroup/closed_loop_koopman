@@ -170,7 +170,7 @@ def task_evaluate_models():
         results = WD.joinpath(
             'build',
             'predictions',
-            f'{lifting_function_type}__predictions.pickle',
+            f'{lifting_function_type}.pickle',
         )
         yield {
             'name':
