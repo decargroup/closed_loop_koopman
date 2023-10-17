@@ -50,7 +50,7 @@ def task_preprocess_experiments():
         experiment = WD.joinpath(
             'build',
             'experiments',
-            f'dataset_{name}.pickle',
+            f'{name}.pickle',
         )
         yield {
             'name': name,
@@ -71,7 +71,7 @@ def task_plot_experiments():
         experiment = WD.joinpath(
             'build',
             'experiments',
-            f'dataset_{name}.pickle',
+            f'{name}.pickle',
         )
         plot_dir = WD.joinpath('build', 'experiment_plots', name)
         yield {
@@ -103,7 +103,7 @@ def task_run_cross_validation():
     experiment = WD.joinpath(
         'build',
         'experiments',
-        'dataset_training_controller.pickle',
+        'training_controller.pickle',
     )
     for study_type in ['closed_loop', 'open_loop']:
         lifting_functions = WD.joinpath(
@@ -151,12 +151,12 @@ def task_evaluate_models():
     experiment_training_controller = WD.joinpath(
         'build',
         'experiments',
-        'dataset_training_controller.pickle',
+        'training_controller.pickle',
     )
     experiment_test_controller = WD.joinpath(
         'build',
         'experiments',
-        'dataset_test_controller.pickle',
+        'test_controller.pickle',
     )
     results = WD.joinpath(
         'build',
@@ -186,12 +186,12 @@ def task_evaluate_models():
 #         experiment_path_training_controller = WD.joinpath(
 #             'build',
 #             'experiments',
-#             'dataset_training_controller.pickle',
+#             'training_controller.pickle',
 #         )
 #         experiment_path_test_controller = WD.joinpath(
 #             'build',
 #             'experiments',
-#             'dataset_test_controller.pickle',
+#             'test_controller.pickle',
 #         )
 #         results_path = WD.joinpath('build', 'predictions', 'poly_delay.pickle')
 #         plot_path = WD.joinpath(
