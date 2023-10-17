@@ -90,7 +90,6 @@ def main():
 
     study = optuna.load_study(
         storage=args.study_path,
-        study_name='open_loop',
     )
     study.optimize(
         objective,
