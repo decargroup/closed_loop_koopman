@@ -85,20 +85,17 @@ def task_plot_experiments():
 
 def task_save_lifting_functions():
     """Save lifting functions for shared use."""
-    lifting_function_types = ['poly_delay']
-    for lf_type in lifting_function_types:
-        lf_path = WD.joinpath(
-            'build',
-            'lifting_functions',
-            f'{lf_type}.pickle',
-        )
-        yield {
-            'name': lf_type,
-            'actions': [(action_save_lifting_functions, (lf_path, lf_type))],
-            'targets': [lf_path],
-            'uptodate': [True],
-            'clean': True,
-        }
+    lf_path = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    yield {
+        'actions': [(action_save_lifting_functions, (lf_path, ))],
+        'targets': [lf_path],
+        'uptodate': [True],
+        'clean': True,
+    }
 
 
 def task_run_cross_validation():
@@ -108,86 +105,110 @@ def task_run_cross_validation():
         'experiments',
         'dataset_training_controller.pickle',
     )
-    lifting_function_types = ['poly_delay']
-    for lifting_function_type in lifting_function_types:
-        for study_type in ['closed_loop', 'open_loop']:
-            lifting_functions = WD.joinpath(
-                'build',
-                'lifting_functions',
-                f'{lifting_function_type}.pickle',
-            )
-            study = WD.joinpath(
-                'build',
-                'studies',
-                f'{lifting_function_type}__{study_type}.db',
-            )
-            yield {
-                'name':
-                f'{lifting_function_type}__{study_type}',
-                'actions': [(action_run_cross_validation, (
-                    experiment,
-                    lifting_functions,
-                    study,
-                    lifting_function_type,
-                    study_type,
-                ))],
-                'file_dep': [experiment, lifting_functions],
-                'targets': [study],
-                'clean':
-                True,
-            }
+    for study_type in ['closed_loop', 'open_loop']:
+        lifting_functions = WD.joinpath(
+            'build',
+            'lifting_functions',
+            'lifting_functions.pickle',
+        )
+        study = WD.joinpath(
+            'build',
+            'studies',
+            f'{study_type}.db',
+        )
+        yield {
+            'name': study_type,
+            'actions': [(action_run_cross_validation, (
+                experiment,
+                lifting_functions,
+                study,
+                study_type,
+            ))],
+            'file_dep': [experiment, lifting_functions],
+            'targets': [study],
+            'clean':
+            True,
+        }
 
 
 def task_evaluate_models():
     """Evaluate cross-validation results."""
-    lifting_function_types = ['poly_delay']
-    for lifting_function_type in lifting_function_types:
-        lifting_functions = WD.joinpath(
-            'build',
-            'lifting_functions',
-            f'{lifting_function_type}.pickle',
-        )
-        study_cl = WD.joinpath(
-            'build',
-            'studies',
-            f'{lifting_function_type}__closed_loop.db',
-        )
-        study_ol = WD.joinpath(
-            'build',
-            'studies',
-            f'{lifting_function_type}__open_loop.db',
-        )
-        experiment_training_controller = WD.joinpath(
-            'build',
-            'experiments',
-            'dataset_training_controller.pickle',
-        )
-        experiment_test_controller = WD.joinpath(
-            'build',
-            'experiments',
-            'dataset_test_controller.pickle',
-        )
-        results = WD.joinpath(
-            'build',
-            'predictions',
-            f'{lifting_function_type}.pickle',
-        )
-        yield {
-            'name':
-            lifting_function_type,
-            'actions': [(action_evaluate_models, (
-                lifting_functions,
-                study_cl,
-                study_ol,
-                experiment_training_controller,
-                experiment_test_controller,
-                results,
-            ))],
-            'file_dep': [lifting_functions, study_cl, study_ol],
-            'targets': [results],
-            'clean':
-            True,
-        }
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    study_cl = WD.joinpath(
+        'build',
+        'studies',
+        'closed_loop.db',
+    )
+    study_ol = WD.joinpath(
+        'build',
+        'studies',
+        'open_loop.db',
+    )
+    experiment_training_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'dataset_training_controller.pickle',
+    )
+    experiment_test_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'dataset_test_controller.pickle',
+    )
+    results = WD.joinpath(
+        'build',
+        'predictions',
+        'predictions.pickle',
+    )
+    yield {
+        'actions': [(action_evaluate_models, (
+            lifting_functions,
+            study_cl,
+            study_ol,
+            experiment_training_controller,
+            experiment_test_controller,
+            results,
+        ))],
+        'file_dep': [lifting_functions, study_cl, study_ol],
+        'targets': [results],
+        'clean':
+        True,
+    }
+
+
+# def task_generate_paper_plots():
+#     """Generate plots for paper."""
+#     plot_types = ['prediction_ol']
+#     for plot_type in plot_types:
+#         experiment_path_training_controller = WD.joinpath(
+#             'build',
+#             'experiments',
+#             'dataset_training_controller.pickle',
+#         )
+#         experiment_path_test_controller = WD.joinpath(
+#             'build',
+#             'experiments',
+#             'dataset_test_controller.pickle',
+#         )
+#         results_path = WD.joinpath('build', 'predictions', 'poly_delay.pickle')
+#         plot_path = WD.joinpath(
+#             'build',
+#             'paper_plots',
+#             f'{plot_type}.pdf',
+#         )
+#         yield {
+#             'name': plot_type,
+#             'actions': [(action_generate_paper_plots, (
+#                 plot_path,
+#                 plot_type,
+#             ))],
+#             'file_dep': [],
+#             'targets': [plot_path],
+#             'clean': True,
+#         }
 
 
 def action_preprocess_experiments(
@@ -415,27 +436,21 @@ def action_plot_experiments(
 
 def action_save_lifting_functions(
     lifting_function_path: pathlib.Path,
-    lifting_function_type: str,
 ):
     """Save lifting functions for shared use."""
-    if lifting_function_type == 'linear':
-        lifting_functions = None
-    elif lifting_function_type == 'poly_delay':
-        lifting_functions = [
-            (
-                'poly',
-                pykoop.PolynomialLiftingFn(order=2),
+    lifting_functions = [
+        (
+            'poly',
+            pykoop.PolynomialLiftingFn(order=2),
+        ),
+        (
+            'delay',
+            pykoop.DelayLiftingFn(
+                n_delays_state=10,
+                n_delays_input=10,
             ),
-            (
-                'delay',
-                pykoop.DelayLiftingFn(
-                    n_delays_state=10,
-                    n_delays_input=10,
-                ),
-            ),
-        ]
-    else:
-        raise ValueError('Invalid value for `lifting_function_type`.')
+        ),
+    ]
     lifting_function_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(lifting_functions, lifting_function_path)
 
@@ -444,7 +459,6 @@ def action_run_cross_validation(
     experiment_path: pathlib.Path,
     lifting_functions_path: pathlib.Path,
     study_path: pathlib.Path,
-    lifting_function_type: str,
     study_type: str,
 ):
     """Run cross-validation."""
@@ -458,7 +472,7 @@ def action_run_cross_validation(
         storage=storage_url,
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
         pruner=optuna.pruners.ThresholdPruner(lower=-10),
-        study_name=f'{lifting_function_type}__{study_type}',
+        study_name=study_type,
         direction='maximize',
     )
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
@@ -617,3 +631,8 @@ def action_evaluate_models(
     }
     results_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(results, results_path)
+
+
+# def action_generate_paper_plots():
+#     """Generate plots for paper."""
+#     pass
