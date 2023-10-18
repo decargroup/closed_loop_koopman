@@ -48,6 +48,7 @@ def main():
         gss = sklearn.model_selection.GroupShuffleSplit(
             n_splits=3,
             test_size=0.2,
+            random_state=args.sklearn_split_seed,
         )
         gss_iter = gss.split(
             dataset['open_loop']['X_train'],
