@@ -117,7 +117,8 @@ def task_run_cross_validation():
             f'{study_type}.db',
         )
         yield {
-            'name': study_type,
+            'name':
+            study_type,
             'actions': [(action_run_cross_validation, (
                 experiment,
                 lifting_functions,
@@ -158,7 +159,7 @@ def task_evaluate_models():
         'experiments',
         'test_controller.pickle',
     )
-    results = WD.joinpath(
+    predictions = WD.joinpath(
         'build',
         'predictions',
         'predictions.pickle',
@@ -170,45 +171,58 @@ def task_evaluate_models():
             study_ol,
             experiment_training_controller,
             experiment_test_controller,
-            results,
+            predictions,
         ))],
         'file_dep': [lifting_functions, study_cl, study_ol],
-        'targets': [results],
+        'targets': [predictions],
         'clean':
         True,
     }
 
 
-# def task_generate_paper_plots():
-#     """Generate plots for paper."""
-#     plot_types = ['prediction_ol']
-#     for plot_type in plot_types:
-#         experiment_path_training_controller = WD.joinpath(
-#             'build',
-#             'experiments',
-#             'training_controller.pickle',
-#         )
-#         experiment_path_test_controller = WD.joinpath(
-#             'build',
-#             'experiments',
-#             'test_controller.pickle',
-#         )
-#         results_path = WD.joinpath('build', 'predictions', 'poly_delay.pickle')
-#         plot_path = WD.joinpath(
-#             'build',
-#             'paper_plots',
-#             f'{plot_type}.pdf',
-#         )
-#         yield {
-#             'name': plot_type,
-#             'actions': [(action_generate_paper_plots, (
-#                 plot_path,
-#                 plot_type,
-#             ))],
-#             'file_dep': [],
-#             'targets': [plot_path],
-#             'clean': True,
-#         }
+def task_generate_paper_plots():
+    """Generate plots for paper."""
+    plot_types = ['predicted_traj_ol']
+    for plot_type in plot_types:
+        experiment_path_training_controller = WD.joinpath(
+            'build',
+            'experiments',
+            'training_controller.pickle',
+        )
+        experiment_path_test_controller = WD.joinpath(
+            'build',
+            'experiments',
+            'test_controller.pickle',
+        )
+        predictions_path = WD.joinpath(
+            'build',
+            'predictions',
+            'predictions.pickle',
+        )
+        plot_path = WD.joinpath(
+            'build',
+            'paper_plots',
+            f'{plot_type}.pdf',
+        )
+        yield {
+            'name':
+            plot_type,
+            'actions': [(action_generate_paper_plots, (
+                experiment_path_training_controller,
+                experiment_path_test_controller,
+                predictions_path,
+                plot_path,
+                plot_type,
+            ))],
+            'file_dep': [
+                experiment_path_training_controller,
+                experiment_path_test_controller,
+                predictions_path,
+            ],
+            'targets': [plot_path],
+            'clean':
+            True,
+        }
 
 
 def action_preprocess_experiments(
@@ -434,9 +448,7 @@ def action_plot_experiments(
     plt.close(fig_c)
 
 
-def action_save_lifting_functions(
-    lifting_function_path: pathlib.Path,
-):
+def action_save_lifting_functions(lifting_function_path: pathlib.Path, ):
     """Save lifting functions for shared use."""
     lifting_functions = [
         (
@@ -505,7 +517,7 @@ def action_evaluate_models(
     study_path_ol: pathlib.Path,
     experiment_path_training_controller: pathlib.Path,
     experiment_path_test_controller: pathlib.Path,
-    results_path: pathlib.Path,
+    predictions_path: pathlib.Path,
 ):
     """Evaluate cross-validation results."""
     # Load studies
@@ -629,10 +641,38 @@ def action_evaluate_models(
         'kp_test_from_ol': kp_test_from_ol,
         'kp_ol': kp_ol,
     }
-    results_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(results, results_path)
+    predictions_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(results, predictions_path)
 
 
-# def action_generate_paper_plots():
-#     """Generate plots for paper."""
-#     pass
+def action_generate_paper_plots(
+    experiment_path_training_controller: pathlib.Path,
+    experiment_path_test_controller: pathlib.Path,
+    predictions_path: pathlib.Path,
+    plot_path: pathlib.Path,
+    plot_type: str,
+):
+    """Generate plots for paper."""
+    # Load data
+    exp_train = joblib.load(experiment_path_training_controller)
+    exp_test = joblib.load(experiment_path_test_controller)
+    pred = joblib.load(predictions_path)
+    # Generate plot
+    if plot_type == 'predicted_traj_ol':
+        fig, ax = plt.subplots(3, 1)
+        ax[0].plot(exp_train['open_loop']['X_test'][:, 1], label='true')
+        ax[0].plot(pred['Xp_train_ol_from_ol'][:, 1], label='from OL')
+        ax[0].plot(pred['Xp_train_ol_from_cl'][:, 1], label='from CL')
+        ax[0].set_ylim([-1, 1])
+        ax[1].plot(exp_train['open_loop']['X_test'][:, 2])
+        ax[1].plot(pred['Xp_train_ol_from_ol'][:, 2])
+        ax[1].plot(pred['Xp_train_ol_from_cl'][:, 2])
+        ax[1].set_ylim([-0.25, 0.25])
+        ax[2].plot(exp_train['open_loop']['X_test'][:, 2])
+        ax[0].legend()
+        fig.suptitle('Xp_train')
+    else:
+        raise ValueError('Invalid `plot_type`.')
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(plot_path)
+    plt.close(fig)
