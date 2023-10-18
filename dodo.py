@@ -657,18 +657,69 @@ def action_generate_paper_plots(
     exp_train = joblib.load(experiment_path_training_controller)
     exp_test = joblib.load(experiment_path_test_controller)
     pred = joblib.load(predictions_path)
+    # Select data matrix from first episode of each
+    ep_idx = 0
+    X_train_cl_true = pykoop.split_episodes(
+        exp_train['closed_loop']['X_test'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_train_cl_from_cl = pykoop.split_episodes(
+        pred['Xp_train_cl_from_cl'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_train_cl_from_ol = pykoop.split_episodes(
+        pred['Xp_train_cl_from_ol'],
+        episode_feature=True,
+    )[ep_idx][1]
+    X_test_cl_true = pykoop.split_episodes(
+        exp_test['closed_loop']['X_test'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_test_cl_from_cl = pykoop.split_episodes(
+        pred['Xp_test_cl_from_cl'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_test_cl_from_ol = pykoop.split_episodes(
+        pred['Xp_test_cl_from_ol'],
+        episode_feature=True,
+    )[ep_idx][1]
+    # Select data matrix from first episode of each
+    X_train_ol_true = pykoop.split_episodes(
+        exp_train['open_loop']['X_test'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_train_ol_from_cl = pykoop.split_episodes(
+        pred['Xp_train_ol_from_cl'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_train_ol_from_ol = pykoop.split_episodes(
+        pred['Xp_train_ol_from_ol'],
+        episode_feature=True,
+    )[ep_idx][1]
+    X_test_ol_true = pykoop.split_episodes(
+        exp_test['open_loop']['X_test'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_test_ol_from_cl = pykoop.split_episodes(
+        pred['Xp_test_ol_from_cl'],
+        episode_feature=True,
+    )[ep_idx][1]
+    Xp_test_ol_from_ol = pykoop.split_episodes(
+        pred['Xp_test_ol_from_ol'],
+        episode_feature=True,
+    )[ep_idx][1]
     # Generate plot
     if plot_type == 'predicted_traj_ol':
         fig, ax = plt.subplots(3, 1)
-        ax[0].plot(exp_train['open_loop']['X_test'][:, 1], label='true')
-        ax[0].plot(pred['Xp_train_ol_from_ol'][:, 1], label='from OL')
-        ax[0].plot(pred['Xp_train_ol_from_cl'][:, 1], label='from CL')
-        ax[0].set_ylim([-1, 1])
-        ax[1].plot(exp_train['open_loop']['X_test'][:, 2])
-        ax[1].plot(pred['Xp_train_ol_from_ol'][:, 2])
-        ax[1].plot(pred['Xp_train_ol_from_cl'][:, 2])
+        ax[0].plot(X_train_ol_true[:, 0], label='true')
+        ax[0].plot(Xp_train_ol_from_ol[:, 0], label='from OL')
+        ax[0].plot(Xp_train_ol_from_cl[:, 0], label='from CL')
+        ax[0].set_ylim([-2, 2])
+        ax[1].plot(X_train_ol_true[:, 1])
+        ax[1].plot(Xp_train_ol_from_ol[:, 1])
+        ax[1].plot(Xp_train_ol_from_cl[:, 1])
         ax[1].set_ylim([-0.25, 0.25])
-        ax[2].plot(exp_train['open_loop']['X_test'][:, 2])
+        ax[2].plot(X_train_ol_true[:, 2])
         ax[0].legend()
         fig.suptitle('Xp_train')
     else:
