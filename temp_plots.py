@@ -5,6 +5,7 @@ import pathlib
 import joblib
 import numpy as np
 import pykoop
+import scipy.linalg
 from matplotlib import pyplot as plt
 
 WD = pathlib.Path(__file__).parent.resolve()
@@ -153,17 +154,17 @@ def main():
     ax[3].set_ylim([-0.25, 0.25])
     fig.suptitle('Xp_test_from_ol')
 
-    print(res['kp_train_from_cl'].regressor_.alpha)
-    print(res['kp_ol'].regressor_.alpha)
+    # print(res['kp_train_from_cl'].regressor_.alpha)
+    # print(res['kp_ol'].regressor_.alpha)
 
     fig, ax = res['kp_train_from_cl'].plot_eigenvalues()
-    fig.suptitle('kp_train_from_cl')
+    fig.suptitle(f"kp_train_from_cl {max_eig(res['kp_train_from_cl'])}")
     fig, ax = res['kp_train_from_ol'].plot_eigenvalues()
-    fig.suptitle('kp_train_from_ol')
+    fig.suptitle(f"kp_train_from_ol {max_eig(res['kp_train_from_ol'])}")
     fig, ax = res['kp_test_from_cl'].plot_eigenvalues()
-    fig.suptitle('kp_test_from_cl')
+    fig.suptitle(f"kp_test_from_cl {max_eig(res['kp_test_from_cl'])}")
     fig, ax = res['kp_test_from_ol'].plot_eigenvalues()
-    fig.suptitle('kp_test_from_ol')
+    fig.suptitle(f"kp_test_from_ol {max_eig(res['kp_test_from_ol'])}")
 
     fig, ax = plt.subplots(2, 1)
     ax[0].plot(exp_train['open_loop']['X_test'][:, 1], label='true')
@@ -190,11 +191,21 @@ def main():
     fig.suptitle('Xp_test')
 
     fig, ax = res['kp_train_from_cl'].kp_plant_.plot_eigenvalues()
-    fig.suptitle('kp_train_ol_from_cl')
+    fig.suptitle(
+        f"kp_train_ol_from_cl {max_eig(res['kp_train_from_cl'].kp_plant_)}")
     fig, ax = res['kp_ol'].plot_eigenvalues()
-    fig.suptitle('kp_ol')
+    fig.suptitle(f"kp_ol {max_eig(res['kp_ol'])}")
 
     plt.show()
+
+
+def max_eig(kp):
+    """Print max eig."""
+    U = kp.regressor_.coef_.T
+    A = U[:, :U.shape[0]]
+    eig = scipy.linalg.eig(A)[0]
+    max_eig = np.max(np.abs(eig))
+    return max_eig
 
 
 if __name__ == '__main__':
