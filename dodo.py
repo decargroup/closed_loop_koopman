@@ -262,13 +262,10 @@ def task_score_predictions():
         'summary.csv',
     )
     return {
-        'actions': [(action_score_predictions, (
-            experiment_path_training_controller,
-            experiment_path_test_controller,
-            predictions_path,
-            score_path,
-            summary_path
-        ))],
+        'actions': [(action_score_predictions,
+                     (experiment_path_training_controller,
+                      experiment_path_test_controller, predictions_path,
+                      score_path, summary_path))],
         'file_dep': [
             experiment_path_training_controller,
             experiment_path_test_controller,
@@ -787,7 +784,6 @@ def action_generate_paper_plots(
         ax[1].set_ylim([-0.25, 0.25])
         ax[2].plot(X_train_ol_true[:, 2])
         ax[0].legend()
-        fig.suptitle('Xp_train_ol')
     elif plot_type == 'traj_test_ol':
         fig, ax = plt.subplots(3, 1)
         ax[0].plot(X_test_ol_true[:, 0], label='true')
@@ -800,7 +796,6 @@ def action_generate_paper_plots(
         ax[1].set_ylim([-0.25, 0.25])
         ax[2].plot(X_test_ol_true[:, 2])
         ax[0].legend()
-        fig.suptitle('Xp_test_ol')
     elif plot_type == 'traj_train_cl':
         fig, ax = plt.subplots(7, 1)
         ax[0].plot(X_train_cl_true[:, 0], label='true')
@@ -823,7 +818,6 @@ def action_generate_paper_plots(
         ax[5].plot(X_train_cl_true[:, 5])
         ax[6].plot(X_train_cl_true[:, 6])
         ax[0].legend()
-        fig.suptitle('Xp_train_cl')
     elif plot_type == 'traj_test_cl':
         fig, ax = plt.subplots(7, 1)
         ax[0].plot(X_test_cl_true[:, 0], label='true')
@@ -846,39 +840,112 @@ def action_generate_paper_plots(
         ax[5].plot(X_test_cl_true[:, 5])
         ax[6].plot(X_test_cl_true[:, 6])
         ax[0].legend()
-        fig.suptitle('Xp_test_cl')
     elif plot_type == 'eigvals_cl':
-        fig = plt.figure()
+        # Create figure
+        fig = plt.figure(constrained_layout=True, figsize=(5, 5))
         ax = fig.add_subplot(projection='polar')
+        # Set common scatter plot settings
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        # Draw circle of unit radius
         th = np.linspace(0, 2 * np.pi)
-        ax.plot(th, np.ones(th.shape), '--')
+        ax.plot(
+            th,
+            np.ones(th.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        # Plot eigenvalues
         ax.scatter(
             np.angle(eigvals_cl_from_cl),
             np.abs(eigvals_cl_from_cl),
-            label='cl_from_cl',
+            color=OKABE_ITO['sky blue'],
+            marker='s',
+            **style,
         )
         ax.scatter(
             np.angle(eigvals_cl_from_ol),
             np.abs(eigvals_cl_from_ol),
-            label='cl_from_ol',
+            color=OKABE_ITO['orange'],
+            marker='o',
+            **style,
         )
-        ax.legend()
+        # Set up grid and axis limits
+        ax.grid(linestyle='--')
+        ax.set_rlim(0, 1.2)
+        # Set up axis labels
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        # Set up legend
+        ax.legend(
+            [
+                ax.get_children()[2],
+                ax.get_children()[1],
+            ],
+            [
+                'Extended DMD',
+                'Closed-loop Koop.',
+            ],
+            loc='upper right',
+        )
     elif plot_type == 'eigvals_ol':
-        fig = plt.figure()
+        # Create figure
+        fig = plt.figure(constrained_layout=True, figsize=(5, 5))
         ax = fig.add_subplot(projection='polar')
+        # Set common scatter plot settings
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        # Draw circle of unit radius
         th = np.linspace(0, 2 * np.pi)
-        ax.plot(th, np.ones(th.shape), '--')
+        ax.plot(
+            th,
+            np.ones(th.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        # Plot eigenvalues
         ax.scatter(
             np.angle(eigvals_ol_from_cl),
             np.abs(eigvals_ol_from_cl),
-            label='ol_from_cl',
+            color=OKABE_ITO['sky blue'],
+            marker='s',
+            **style,
         )
         ax.scatter(
             np.angle(eigvals_ol_from_ol),
             np.abs(eigvals_ol_from_ol),
-            label='ol_from_ol',
+            color=OKABE_ITO['orange'],
+            marker='o',
+            **style,
         )
-        ax.legend()
+        # Set up grid and axis limits
+        ax.grid(linestyle='--')
+        ax.set_rlim(0, 1.2)
+        # Set up axis labels
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        # Set up legend
+        ax.legend(
+            [
+                ax.get_children()[2],
+                ax.get_children()[1],
+            ],
+            [
+                'Extended DMD',
+                'Closed-loop Koop.',
+            ],
+            loc='upper right',
+        )
     else:
         raise ValueError('Invalid `plot_type`.')
     plot_path.parent.mkdir(parents=True, exist_ok=True)
