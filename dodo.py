@@ -9,6 +9,7 @@ import doit
 import joblib
 import numpy as np
 import optuna
+import pandas
 import pykoop
 import scipy.linalg
 import tomli
@@ -231,6 +232,52 @@ def task_generate_paper_plots():
             'clean':
             True,
         }
+
+
+def task_score_predictions():
+    """Calculate prediction scores."""
+    experiment_path_training_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    experiment_path_test_controller = WD.joinpath(
+        'build',
+        'experiments',
+        'test_controller.pickle',
+    )
+    predictions_path = WD.joinpath(
+        'build',
+        'predictions',
+        'predictions.pickle',
+    )
+    score_path = WD.joinpath(
+        'build',
+        'scores',
+        'scores.csv',
+    )
+    summary_path = WD.joinpath(
+        'build',
+        'scores',
+        'summary.csv',
+    )
+    return {
+        'actions': [(action_score_predictions, (
+            experiment_path_training_controller,
+            experiment_path_test_controller,
+            predictions_path,
+            score_path,
+            summary_path
+        ))],
+        'file_dep': [
+            experiment_path_training_controller,
+            experiment_path_test_controller,
+            predictions_path,
+        ],
+        'targets': [score_path, summary_path],
+        'clean':
+        True,
+    }
 
 
 def action_preprocess_experiments(
@@ -837,6 +884,113 @@ def action_generate_paper_plots(
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(plot_path)
     plt.close(fig)
+
+
+def action_score_predictions(
+    experiment_path_training_controller: pathlib.Path,
+    experiment_path_test_controller: pathlib.Path,
+    predictions_path: pathlib.Path,
+    score_path: pathlib.Path,
+    summary_path: pathlib.Path,
+):
+    """Calculate prediction scores."""
+    # Load data
+    exp_train = joblib.load(experiment_path_training_controller)
+    exp_test = joblib.load(experiment_path_test_controller)
+    pred = joblib.load(predictions_path)
+    # Define metrics
+    metrics = ['explained_variance', 'neg_mean_squared_error', 'r2']
+    # Get the closed-loop episodes with training controller
+    eps_train_cl_true = pykoop.split_episodes(
+        exp_train['closed_loop']['X_test'],
+        episode_feature=True,
+    )
+    eps_train_cl_from_cl = pykoop.split_episodes(
+        pred['Xp_train_cl_from_cl'],
+        episode_feature=True,
+    )
+    eps_train_cl_from_ol = pykoop.split_episodes(
+        pred['Xp_train_cl_from_ol'],
+        episode_feature=True,
+    )
+    # Get the closed-loop episodes with test controller
+    eps_test_cl_true = pykoop.split_episodes(
+        exp_test['closed_loop']['X_test'],
+        episode_feature=True,
+    )
+    eps_test_cl_from_cl = pykoop.split_episodes(
+        pred['Xp_test_cl_from_cl'],
+        episode_feature=True,
+    )
+    eps_test_cl_from_ol = pykoop.split_episodes(
+        pred['Xp_test_cl_from_ol'],
+        episode_feature=True,
+    )
+    # Double-check number of episodes
+    if len(eps_train_cl_true) != len(eps_test_cl_true):
+        raise ValueError('Must have same number of episodes in test set for '
+                         'training and test controllers.')
+    n_eps = len(eps_train_cl_true)
+    # Run scoring for each metric
+    scores = {}
+    for metric in metrics:
+        scores_train_cl_from_cl = np.zeros((n_eps, ))
+        scores_train_cl_from_ol = np.zeros((n_eps, ))
+        scores_test_cl_from_cl = np.zeros((n_eps, ))
+        scores_test_cl_from_ol = np.zeros((n_eps, ))
+        for i in range(n_eps):
+            X_train_cl_true_i = eps_train_cl_true[i][1]
+            X_train_cl_from_cl_i = eps_train_cl_from_cl[i][1]
+            X_train_cl_from_ol_i = eps_train_cl_from_ol[i][1]
+            scores_train_cl_from_cl[i] = pykoop.score_trajectory(
+                X_train_cl_from_cl_i,
+                X_train_cl_true_i[:, :X_train_cl_from_cl_i.shape[1]],
+                regression_metric=metric,
+                episode_feature=False,
+            )
+            scores_train_cl_from_ol[i] = pykoop.score_trajectory(
+                X_train_cl_from_ol_i,
+                X_train_cl_true_i[:, :X_train_cl_from_ol_i.shape[1]],
+                regression_metric=metric,
+                episode_feature=False,
+            )
+            X_test_cl_true_i = eps_test_cl_true[i][1]
+            X_test_cl_from_cl_i = eps_test_cl_from_cl[i][1]
+            X_test_cl_from_ol_i = eps_test_cl_from_ol[i][1]
+            scores_test_cl_from_cl[i] = pykoop.score_trajectory(
+                X_test_cl_from_cl_i,
+                X_test_cl_true_i[:, :X_test_cl_from_cl_i.shape[1]],
+                regression_metric=metric,
+                episode_feature=False,
+            )
+            scores_test_cl_from_ol[i] = pykoop.score_trajectory(
+                X_test_cl_from_ol_i,
+                X_test_cl_true_i[:, :X_test_cl_from_ol_i.shape[1]],
+                regression_metric=metric,
+                episode_feature=False,
+            )
+        # If scores are finite, add them to the dict
+        if all(np.isfinite(scores_train_cl_from_cl)):
+            scores[f'{metric}__train__cl_from_cl'] = scores_train_cl_from_cl
+        if all(np.isfinite(scores_train_cl_from_ol)):
+            scores[f'{metric}__train__cl_from_ol'] = scores_train_cl_from_ol
+        if all(np.isfinite(scores_test_cl_from_cl)):
+            scores[f'{metric}__test__cl_from_cl'] = scores_test_cl_from_cl
+        if all(np.isfinite(scores_test_cl_from_ol)):
+            scores[f'{metric}__test__cl_from_ol'] = scores_test_cl_from_ol
+    # Save score dict as CSV
+    score_df = pandas.DataFrame.from_dict(scores)
+    score_path.parent.mkdir(parents=True, exist_ok=True)
+    score_df.to_csv(score_path, index=False)
+    # Create summary dict
+    summary = {}
+    for key, val in scores.items():
+        summary[f'mean__{key}'] = [np.mean(val)]
+        summary[f'std__{key}'] = [np.std(val)]
+    # Save summary dict as CSV
+    summary_df = pandas.DataFrame.from_dict(summary)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(summary_path, index=False)
 
 
 def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> np.ndarray:
