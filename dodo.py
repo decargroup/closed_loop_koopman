@@ -777,29 +777,131 @@ def action_generate_paper_plots(
     eigvals_ol_from_ol = _eigvals(kp_ol_from_ol)
     # Generate plot
     if plot_type == 'traj_train_ol':
-        fig, ax = plt.subplots(3, 1, constrained_layout=True, figsize=(5, 5))
-        ax[0].plot(t_train, X_train_ol_true[:, 0], label='true')
-        ax[0].plot(t_train, Xp_train_ol_from_ol[:, 0], label='from OL')
-        ax[0].plot(t_train, Xp_train_ol_from_cl[:, 0], label='from CL')
-        ax[0].set_ylim([-2, 2])
-        ax[1].plot(t_train, X_train_ol_true[:, 1])
-        ax[1].plot(t_train, Xp_train_ol_from_ol[:, 1])
-        ax[1].plot(t_train, Xp_train_ol_from_cl[:, 1])
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(5, 5),
+        )
+        ax[0].plot(
+            t_train,
+            X_train_ol_true[:, 0],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+            label='Test episode #1',
+        )
+        ax[0].plot(
+            t_train,
+            Xp_train_ol_from_ol[:, 0],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+            label='Extended DMD',
+        )
+        ax[0].plot(
+            t_train,
+            Xp_train_ol_from_cl[:, 0],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+            label='Closed-loop Koop.',
+        )
+        ax[0].set_ylim([-1.5, 1.5])
+        ax[1].plot(
+            t_train,
+            X_train_ol_true[:, 1],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t_train,
+            Xp_train_ol_from_ol[:, 1],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t_train,
+            Xp_train_ol_from_cl[:, 1],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
         ax[1].set_ylim([-0.25, 0.25])
-        ax[2].plot(t_train, X_train_ol_true[:, 2])
-        ax[0].legend()
+        ax[2].plot(
+            t_train,
+            X_train_ol_true[:, 2],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        for a in np.ravel(ax):
+            a.grid(linestyle='--')
+        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        ax[0].legend(loc='upper right')
+        fig.align_labels()
     elif plot_type == 'traj_test_ol':
-        fig, ax = plt.subplots(3, 1)
-        ax[0].plot(X_test_ol_true[:, 0], label='true')
-        ax[0].plot(Xp_test_ol_from_ol[:, 0], label='from OL')
-        ax[0].plot(Xp_test_ol_from_cl[:, 0], label='from CL')
-        ax[0].set_ylim([-2, 2])
-        ax[1].plot(X_test_ol_true[:, 1])
-        ax[1].plot(Xp_test_ol_from_ol[:, 1])
-        ax[1].plot(Xp_test_ol_from_cl[:, 1])
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(5, 5),
+        )
+        ax[0].plot(
+            t_test,
+            X_test_ol_true[:, 0],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+            label='Test episode #1',
+        )
+        ax[0].plot(
+            t_test,
+            Xp_test_ol_from_ol[:, 0],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+            label='Extended DMD',
+        )
+        ax[0].plot(
+            t_test,
+            Xp_test_ol_from_cl[:, 0],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+            label='Closed-loop Koop.',
+        )
+        ax[0].set_ylim([-1.5, 1.5])
+        ax[1].plot(
+            t_test,
+            X_test_ol_true[:, 1],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t_test,
+            Xp_test_ol_from_ol[:, 1],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t_test,
+            Xp_test_ol_from_cl[:, 1],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
         ax[1].set_ylim([-0.25, 0.25])
-        ax[2].plot(X_test_ol_true[:, 2])
-        ax[0].legend()
+        ax[2].plot(
+            t_test,
+            X_test_ol_true[:, 2],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        for a in np.ravel(ax):
+            a.grid(linestyle='--')
+        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        ax[0].legend(loc='upper right')
+        fig.align_labels()
     elif plot_type == 'traj_train_cl':
         fig, ax = plt.subplots(7, 1)
         ax[0].plot(X_train_cl_true[:, 0], label='true')
