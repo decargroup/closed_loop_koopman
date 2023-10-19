@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 import optuna
 import pykoop
+import scipy.linalg
 import tomli
 from matplotlib import pyplot as plt
 
@@ -187,6 +188,8 @@ def task_generate_paper_plots():
         'traj_test_ol',
         'traj_train_cl',
         'traj_test_cl',
+        'eigvals_cl',
+        'eigvals_ol',
     ]
     for plot_type in plot_types:
         experiment_path_training_controller = WD.joinpath(
@@ -662,7 +665,7 @@ def action_generate_paper_plots(
     exp_train = joblib.load(experiment_path_training_controller)
     exp_test = joblib.load(experiment_path_test_controller)
     pred = joblib.load(predictions_path)
-    # Select data matrix from first episode of each
+    # Get the data matrix for one episode of each closed-loop prediction
     train_ep = 0
     test_ep = 0
     X_train_cl_true = pykoop.split_episodes(
@@ -689,7 +692,7 @@ def action_generate_paper_plots(
         pred['Xp_test_cl_from_ol'],
         episode_feature=True,
     )[test_ep][1]
-    # Select data matrix from first episode of each
+    # Get the data matrix for one episode of each open-loop prediction
     X_train_ol_true = pykoop.split_episodes(
         exp_train['open_loop']['X_test'],
         episode_feature=True,
@@ -714,6 +717,16 @@ def action_generate_paper_plots(
         pred['Xp_test_ol_from_ol'],
         episode_feature=True,
     )[test_ep][1]
+    # Get Koopman pipelines from predictions dict
+    kp_cl_from_cl = pred['kp_train_from_cl']
+    kp_cl_from_ol = pred['kp_train_from_ol']
+    kp_ol_from_cl = pred['kp_train_from_cl'].kp_plant_
+    kp_ol_from_ol = pred['kp_ol']
+    # Compute eigenvalues of each Koopman matrix
+    eigvals_cl_from_cl = _eigvals(kp_cl_from_cl)
+    eigvals_cl_from_ol = _eigvals(kp_cl_from_ol)
+    eigvals_ol_from_cl = _eigvals(kp_ol_from_cl)
+    eigvals_ol_from_ol = _eigvals(kp_ol_from_ol)
     # Generate plot
     if plot_type == 'traj_train_ol':
         fig, ax = plt.subplots(3, 1)
@@ -787,8 +800,59 @@ def action_generate_paper_plots(
         ax[6].plot(X_test_cl_true[:, 6])
         ax[0].legend()
         fig.suptitle('Xp_test_cl')
+    elif plot_type == 'eigvals_cl':
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        th = np.linspace(0, 2 * np.pi)
+        ax.plot(th, np.ones(th.shape), '--')
+        ax.scatter(
+            np.angle(eigvals_cl_from_cl),
+            np.abs(eigvals_cl_from_cl),
+            label='cl_from_cl',
+        )
+        ax.scatter(
+            np.angle(eigvals_cl_from_ol),
+            np.abs(eigvals_cl_from_ol),
+            label='cl_from_ol',
+        )
+        ax.legend()
+    elif plot_type == 'eigvals_ol':
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        th = np.linspace(0, 2 * np.pi)
+        ax.plot(th, np.ones(th.shape), '--')
+        ax.scatter(
+            np.angle(eigvals_ol_from_cl),
+            np.abs(eigvals_ol_from_cl),
+            label='ol_from_cl',
+        )
+        ax.scatter(
+            np.angle(eigvals_ol_from_ol),
+            np.abs(eigvals_ol_from_ol),
+            label='ol_from_ol',
+        )
+        ax.legend()
     else:
         raise ValueError('Invalid `plot_type`.')
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(plot_path)
     plt.close(fig)
+
+
+def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> np.ndarray:
+    """Compute eigenvalues of the Koopman ``A`` matrix.
+
+    Parameters
+    ----------
+    koopman_pipeline : pykoop.KoopmanPipeline
+        Koopman pipeline.
+
+    Returns
+    -------
+    np.ndarray
+        Eigenvalues.
+    """
+    U = koopman_pipeline.regressor_.coef_.T
+    A = U[:, :U.shape[0]]
+    eigs = scipy.linalg.eigvals(A)
+    return eigs
