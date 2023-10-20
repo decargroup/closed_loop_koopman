@@ -776,7 +776,7 @@ def action_generate_paper_plots(
     eigvals_ol_from_cl = _eigvals(kp_ol_from_cl)
     eigvals_ol_from_ol = _eigvals(kp_ol_from_ol)
 
-    def _plot_traj_ol(t, X_ol_true, Xp_ol_from_ol, Xp_ol_from_cl):
+    def _plot_traj_ol(t, X_ol_true, Xp_ol_from_cl, Xp_ol_from_ol):
         """Generate open-loop trajectory plot."""
         fig, ax = plt.subplots(
             3,
@@ -834,6 +834,142 @@ def action_generate_paper_plots(
         ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
         ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
+        fig.align_labels()
+        fig.legend(
+            [
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+            ],
+            [
+                'Test ep. #1',
+                'EDMD',
+                'Closed-loop Koop.',
+            ],
+            loc='lower left',
+            ncol=3,
+            bbox_to_anchor=(0, 0, 1, 1),
+            mode='expand',
+        )
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.16)
+        return fig
+
+    def _plot_traj_cl(t, X_cl_true, Xp_cl_from_cl, Xp_cl_from_ol):
+        """Generate closed-loop trajectory plot."""
+        fig, ax = plt.subplots(
+            7,
+            1,
+            sharex=True,
+            figsize=(5, 5),
+        )
+        ax[0].plot(
+            t,
+            X_cl_true[:, 0],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[0].plot(
+            t,
+            Xp_cl_from_ol[:, 0],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[0].plot(
+            t,
+            Xp_cl_from_cl[:, 0],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            X_cl_true[:, 1],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            Xp_cl_from_ol[:, 1],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            Xp_cl_from_cl[:, 1],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[2].plot(
+            t,
+            X_cl_true[:, 2],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[2].plot(
+            t,
+            Xp_cl_from_ol[:, 2],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[2].plot(
+            t,
+            Xp_cl_from_cl[:, 2],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[3].plot(
+            t,
+            X_cl_true[:, 3],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[3].plot(
+            t,
+            Xp_cl_from_ol[:, 3],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[3].plot(
+            t,
+            Xp_cl_from_cl[:, 3],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[4].plot(
+            t,
+            X_cl_true[:, 4],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[5].plot(
+            t,
+            X_cl_true[:, 5],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[6].plot(
+            t,
+            X_cl_true[:, 6],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        for a in np.ravel(ax):
+            a.grid(linestyle='--')
+        ax[0].set_ylim([-5, 5])
+        ax[1].set_ylim([-3, 3])
+        ax[2].set_ylim([-1.5, 1.5])
+        ax[3].set_ylim([-0.25, 0.25])
+        # ax[4].set_ylim([-1, 1])
+        # ax[5].set_ylim([-0.25, 0.25])
+        # ax[6].set_ylim([-2, 2])
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$ (1)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$ (1)')
+        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[4].set_ylabel(r'$r_1(t)$ (rad)')
+        ax[5].set_ylabel(r'$r_2(t)$ (rad)')
+        ax[6].set_ylabel(r'$f(t)$ (V)')
+        ax[6].set_xlabel(r'$t$ (s)')
         fig.align_labels()
         fig.legend(
             [
@@ -917,60 +1053,30 @@ def action_generate_paper_plots(
         fig = _plot_traj_ol(
             t_train,
             X_train_ol_true,
-            Xp_train_ol_from_ol,
             Xp_train_ol_from_cl,
+            Xp_train_ol_from_ol,
         )
     elif plot_type == 'traj_test_ol':
         fig = _plot_traj_ol(
             t_test,
             X_test_ol_true,
-            Xp_test_ol_from_ol,
             Xp_test_ol_from_cl,
+            Xp_test_ol_from_ol,
         )
     elif plot_type == 'traj_train_cl':
-        fig, ax = plt.subplots(7, 1)
-        ax[0].plot(X_train_cl_true[:, 0], label='true')
-        ax[0].plot(Xp_train_cl_from_ol[:, 0], label='from OL')
-        ax[0].plot(Xp_train_cl_from_cl[:, 0], label='from CL')
-        ax[0].set_ylim([-4, 4])
-        ax[1].plot(X_train_cl_true[:, 1])
-        ax[1].plot(Xp_train_cl_from_ol[:, 1])
-        ax[1].plot(Xp_train_cl_from_cl[:, 1])
-        ax[1].set_ylim([-4, 4])
-        ax[2].plot(X_train_cl_true[:, 2])
-        ax[2].plot(Xp_train_cl_from_ol[:, 2])
-        ax[2].plot(Xp_train_cl_from_cl[:, 2])
-        ax[2].set_ylim([-2, 2])
-        ax[3].plot(X_train_cl_true[:, 3])
-        ax[3].plot(Xp_train_cl_from_ol[:, 3])
-        ax[3].plot(Xp_train_cl_from_cl[:, 3])
-        ax[3].set_ylim([-2, 2])
-        ax[4].plot(X_train_cl_true[:, 4])
-        ax[5].plot(X_train_cl_true[:, 5])
-        ax[6].plot(X_train_cl_true[:, 6])
-        ax[0].legend()
+        fig = _plot_traj_cl(
+            t_train,
+            X_train_cl_true,
+            Xp_train_cl_from_cl,
+            Xp_train_cl_from_ol,
+        )
     elif plot_type == 'traj_test_cl':
-        fig, ax = plt.subplots(7, 1)
-        ax[0].plot(X_test_cl_true[:, 0], label='true')
-        ax[0].plot(Xp_test_cl_from_ol[:, 0], label='from OL')
-        ax[0].plot(Xp_test_cl_from_cl[:, 0], label='from CL')
-        ax[0].set_ylim([-4, 4])
-        ax[1].plot(X_test_cl_true[:, 1])
-        ax[1].plot(Xp_test_cl_from_ol[:, 1])
-        ax[1].plot(Xp_test_cl_from_cl[:, 1])
-        ax[1].set_ylim([-4, 4])
-        ax[2].plot(X_test_cl_true[:, 2])
-        ax[2].plot(Xp_test_cl_from_ol[:, 2])
-        ax[2].plot(Xp_test_cl_from_cl[:, 2])
-        ax[2].set_ylim([-2, 2])
-        ax[3].plot(X_test_cl_true[:, 3])
-        ax[3].plot(Xp_test_cl_from_ol[:, 3])
-        ax[3].plot(Xp_test_cl_from_cl[:, 3])
-        ax[3].set_ylim([-2, 2])
-        ax[4].plot(X_test_cl_true[:, 4])
-        ax[5].plot(X_test_cl_true[:, 5])
-        ax[6].plot(X_test_cl_true[:, 6])
-        ax[0].legend()
+        fig = _plot_traj_cl(
+            t_test,
+            X_test_cl_true,
+            Xp_test_cl_from_cl,
+            Xp_test_cl_from_ol,
+        )
     elif plot_type == 'eigvals_cl':
         fig = _plot_eigvals(eigvals_cl_from_cl, eigvals_cl_from_ol)
     elif plot_type == 'eigvals_ol':
