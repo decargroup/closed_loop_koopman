@@ -775,159 +775,158 @@ def action_generate_paper_plots(
     eigvals_cl_from_ol = _eigvals(kp_cl_from_ol)
     eigvals_ol_from_cl = _eigvals(kp_ol_from_cl)
     eigvals_ol_from_ol = _eigvals(kp_ol_from_ol)
+
+    def _plot_traj_ol(t, X_ol_true, Xp_ol_from_ol, Xp_ol_from_cl):
+        """Generate open-loop trajectory plot."""
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            figsize=(5, 5),
+        )
+        ax[0].plot(
+            t,
+            X_ol_true[:, 0],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[0].plot(
+            t,
+            Xp_ol_from_ol[:, 0],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[0].plot(
+            t,
+            Xp_ol_from_cl[:, 0],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[0].set_ylim([-1.5, 1.5])
+        ax[1].plot(
+            t,
+            X_ol_true[:, 1],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            Xp_ol_from_ol[:, 1],
+            color=OKABE_ITO['orange'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            Xp_ol_from_cl[:, 1],
+            color=OKABE_ITO['sky blue'],
+            linewidth=2,
+        )
+        ax[1].set_ylim([-0.25, 0.25])
+        ax[2].plot(
+            t,
+            X_ol_true[:, 2],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        for a in np.ravel(ax):
+            a.grid(linestyle='--')
+        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        fig.align_labels()
+        fig.legend(
+            [
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+            ],
+            [
+                'Test ep. #1',
+                'EDMD',
+                'Closed-loop Koop.',
+            ],
+            loc='lower left',
+            ncol=3,
+            bbox_to_anchor=(0, 0, 1, 1),
+            mode='expand',
+        )
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.16)
+        return fig
+
+    def _plot_eigvals(eigvals_from_cl, eigvals_from_ol):
+        """Generate eigenvalue plot."""
+        # Create figure
+        fig = plt.figure(constrained_layout=True, figsize=(5, 5))
+        ax = fig.add_subplot(projection='polar')
+        # Set common scatter plot settings
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        # Draw circle of unit radius
+        th = np.linspace(0, 2 * np.pi)
+        ax.plot(
+            th,
+            np.ones(th.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        # Plot eigenvalues
+        ax.scatter(
+            np.angle(eigvals_from_cl),
+            np.abs(eigvals_from_cl),
+            color=OKABE_ITO['sky blue'],
+            marker='s',
+            **style,
+        )
+        ax.scatter(
+            np.angle(eigvals_from_ol),
+            np.abs(eigvals_from_ol),
+            color=OKABE_ITO['orange'],
+            marker='o',
+            **style,
+        )
+        # Set up grid and axis limits
+        ax.grid(linestyle='--')
+        ax.set_rlim(0, 1.2)
+        # Set up axis labels
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        # Set up legend
+        ax.legend(
+            [
+                ax.get_children()[2],
+                ax.get_children()[1],
+            ],
+            [
+                'Extended DMD',
+                'Closed-loop Koop.',
+            ],
+            loc='lower right',
+            bbox_to_anchor=(1.1, -0.15),
+        )
+        return fig
+
     # Generate plot
     if plot_type == 'traj_train_ol':
-        fig, ax = plt.subplots(
-            3,
-            1,
-            sharex=True,
-            figsize=(5, 5),
-        )
-        ax[0].plot(
+        fig = _plot_traj_ol(
             t_train,
-            X_train_ol_true[:, 0],
-            color=OKABE_ITO['black'],
-            linewidth=2,
+            X_train_ol_true,
+            Xp_train_ol_from_ol,
+            Xp_train_ol_from_cl,
         )
-        ax[0].plot(
-            t_train,
-            Xp_train_ol_from_ol[:, 0],
-            color=OKABE_ITO['orange'],
-            linewidth=2,
-        )
-        ax[0].plot(
-            t_train,
-            Xp_train_ol_from_cl[:, 0],
-            color=OKABE_ITO['sky blue'],
-            linewidth=2,
-        )
-        ax[0].set_ylim([-1.5, 1.5])
-        ax[1].plot(
-            t_train,
-            X_train_ol_true[:, 1],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        ax[1].plot(
-            t_train,
-            Xp_train_ol_from_ol[:, 1],
-            color=OKABE_ITO['orange'],
-            linewidth=2,
-        )
-        ax[1].plot(
-            t_train,
-            Xp_train_ol_from_cl[:, 1],
-            color=OKABE_ITO['sky blue'],
-            linewidth=2,
-        )
-        ax[1].set_ylim([-0.25, 0.25])
-        ax[2].plot(
-            t_train,
-            X_train_ol_true[:, 2],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        for a in np.ravel(ax):
-            a.grid(linestyle='--')
-        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
-        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
-        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
-        ax[2].set_xlabel(r'$t$ (s)')
-        fig.align_labels()
-        fig.legend(
-            [
-                ax[0].get_lines()[0],
-                ax[0].get_lines()[1],
-                ax[0].get_lines()[2],
-            ],
-            [
-                'Test ep. #1',
-                'EDMD',
-                'Closed-loop Koop.',
-            ],
-            loc='lower left',
-            ncol=3,
-            bbox_to_anchor=(0, 0, 1, 1),
-            mode='expand',
-        )
-        fig.tight_layout()
-        fig.subplots_adjust(bottom=0.16)
     elif plot_type == 'traj_test_ol':
-        fig, ax = plt.subplots(
-            3,
-            1,
-            sharex=True,
-            figsize=(5, 5),
-        )
-        ax[0].plot(
+        fig = _plot_traj_ol(
             t_test,
-            X_test_ol_true[:, 0],
-            color=OKABE_ITO['black'],
-            linewidth=2,
+            X_test_ol_true,
+            Xp_test_ol_from_ol,
+            Xp_test_ol_from_cl,
         )
-        ax[0].plot(
-            t_test,
-            Xp_test_ol_from_ol[:, 0],
-            color=OKABE_ITO['orange'],
-            linewidth=2,
-        )
-        ax[0].plot(
-            t_test,
-            Xp_test_ol_from_cl[:, 0],
-            color=OKABE_ITO['sky blue'],
-            linewidth=2,
-        )
-        ax[0].set_ylim([-1.5, 1.5])
-        ax[1].plot(
-            t_test,
-            X_test_ol_true[:, 1],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        ax[1].plot(
-            t_test,
-            Xp_test_ol_from_ol[:, 1],
-            color=OKABE_ITO['orange'],
-            linewidth=2,
-        )
-        ax[1].plot(
-            t_test,
-            Xp_test_ol_from_cl[:, 1],
-            color=OKABE_ITO['sky blue'],
-            linewidth=2,
-        )
-        ax[1].set_ylim([-0.25, 0.25])
-        ax[2].plot(
-            t_test,
-            X_test_ol_true[:, 2],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        for a in np.ravel(ax):
-            a.grid(linestyle='--')
-        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
-        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
-        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
-        ax[2].set_xlabel(r'$t$ (s)')
-        fig.align_labels()
-        fig.legend(
-            [
-                ax[0].get_lines()[0],
-                ax[0].get_lines()[1],
-                ax[0].get_lines()[2],
-            ],
-            [
-                'Test ep. #1',
-                'EDMD',
-                'Closed-loop Koop.',
-            ],
-            loc='lower left',
-            ncol=3,
-            bbox_to_anchor=(0, 0, 1, 1),
-            mode='expand',
-        )
-        fig.tight_layout()
-        fig.subplots_adjust(bottom=0.16)
     elif plot_type == 'traj_train_cl':
         fig, ax = plt.subplots(7, 1)
         ax[0].plot(X_train_cl_true[:, 0], label='true')
@@ -973,113 +972,9 @@ def action_generate_paper_plots(
         ax[6].plot(X_test_cl_true[:, 6])
         ax[0].legend()
     elif plot_type == 'eigvals_cl':
-        # Create figure
-        fig = plt.figure(constrained_layout=True, figsize=(5, 5))
-        ax = fig.add_subplot(projection='polar')
-        # Set common scatter plot settings
-        style = {
-            's': 50,
-            'edgecolors': 'w',
-            'linewidth': 0.25,
-            'zorder': 2,
-        }
-        # Draw circle of unit radius
-        th = np.linspace(0, 2 * np.pi)
-        ax.plot(
-            th,
-            np.ones(th.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
-        )
-        # Plot eigenvalues
-        ax.scatter(
-            np.angle(eigvals_cl_from_cl),
-            np.abs(eigvals_cl_from_cl),
-            color=OKABE_ITO['sky blue'],
-            marker='s',
-            **style,
-        )
-        ax.scatter(
-            np.angle(eigvals_cl_from_ol),
-            np.abs(eigvals_cl_from_ol),
-            color=OKABE_ITO['orange'],
-            marker='o',
-            **style,
-        )
-        # Set up grid and axis limits
-        ax.grid(linestyle='--')
-        ax.set_rlim(0, 1.2)
-        # Set up axis labels
-        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
-        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
-        # Set up legend
-        ax.legend(
-            [
-                ax.get_children()[2],
-                ax.get_children()[1],
-            ],
-            [
-                'Extended DMD',
-                'Closed-loop Koop.',
-            ],
-            loc='lower right',
-            bbox_to_anchor=(1.1, -0.15),
-        )
+        fig = _plot_eigvals(eigvals_cl_from_cl, eigvals_cl_from_ol)
     elif plot_type == 'eigvals_ol':
-        # Create figure
-        fig = plt.figure(constrained_layout=True, figsize=(5, 5))
-        ax = fig.add_subplot(projection='polar')
-        # Set common scatter plot settings
-        style = {
-            's': 50,
-            'edgecolors': 'w',
-            'linewidth': 0.25,
-            'zorder': 2,
-        }
-        # Draw circle of unit radius
-        th = np.linspace(0, 2 * np.pi)
-        ax.plot(
-            th,
-            np.ones(th.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
-        )
-        # Plot eigenvalues
-        ax.scatter(
-            np.angle(eigvals_ol_from_cl),
-            np.abs(eigvals_ol_from_cl),
-            color=OKABE_ITO['sky blue'],
-            marker='s',
-            **style,
-        )
-        ax.scatter(
-            np.angle(eigvals_ol_from_ol),
-            np.abs(eigvals_ol_from_ol),
-            color=OKABE_ITO['orange'],
-            marker='o',
-            **style,
-        )
-        # Set up grid and axis limits
-        ax.grid(linestyle='--')
-        ax.set_rlim(0, 1.2)
-        # Set up axis labels
-        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
-        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
-        # Set up legend
-        ax.legend(
-            [
-                ax.get_children()[2],
-                ax.get_children()[1],
-            ],
-            [
-                'Extended DMD',
-                'Closed-loop Koop.',
-            ],
-            loc='lower right',
-            bbox_to_anchor=(1.1, -0.15),
-        )
+        fig = _plot_eigvals(eigvals_ol_from_cl, eigvals_ol_from_ol)
     else:
         raise ValueError('Invalid `plot_type`.')
     plot_path.parent.mkdir(parents=True, exist_ok=True)
