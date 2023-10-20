@@ -41,12 +41,11 @@ OKABE_ITO = {
 }
 
 # Set LaTeX rendering only if available
-usetex = False
-# usetex = True if shutil.which('latex') else False
+usetex = True if shutil.which('latex') else False
 if usetex:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    # plt.rc('font', size=15)
+    plt.rc('font', size=12)
     plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
 
@@ -863,7 +862,7 @@ def action_generate_paper_plots(
             mode='expand',
         )
         fig.tight_layout()
-        fig.subplots_adjust(bottom=0.16)
+        fig.subplots_adjust(bottom=0.18)
         return fig
 
     def _plot_traj_cl(t, X_cl_true, Xp_cl_from_cl, Xp_cl_from_ol):
@@ -952,8 +951,8 @@ def action_generate_paper_plots(
         ax[1].set_ylim([-3, 3])
         ax[2].set_ylim([-1.5, 1.5])
         ax[3].set_ylim([-0.25, 0.25])
-        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$ (1)')
-        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$ (1)')
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
         ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
         ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
         ax[3].set_xlabel(r'$t$ (s)')
@@ -975,7 +974,7 @@ def action_generate_paper_plots(
             mode='expand',
         )
         fig.tight_layout()
-        fig.subplots_adjust(bottom=0.16)
+        fig.subplots_adjust(bottom=0.18)
         return fig
 
     def _plot_inpt_cl(t, X_cl_true, Xp_cl_from_cl, Xp_cl_from_ol):
