@@ -781,7 +781,6 @@ def action_generate_paper_plots(
             3,
             1,
             sharex=True,
-            constrained_layout=True,
             figsize=(5, 5),
         )
         ax[0].plot(
@@ -789,21 +788,18 @@ def action_generate_paper_plots(
             X_train_ol_true[:, 0],
             color=OKABE_ITO['black'],
             linewidth=2,
-            label='Test episode #1',
         )
         ax[0].plot(
             t_train,
             Xp_train_ol_from_ol[:, 0],
             color=OKABE_ITO['orange'],
             linewidth=2,
-            label='Extended DMD',
         )
         ax[0].plot(
             t_train,
             Xp_train_ol_from_cl[:, 0],
             color=OKABE_ITO['sky blue'],
             linewidth=2,
-            label='Closed-loop Koop.',
         )
         ax[0].set_ylim([-1.5, 1.5])
         ax[1].plot(
@@ -837,14 +833,30 @@ def action_generate_paper_plots(
         ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
         ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
-        ax[0].legend(loc='upper right')
         fig.align_labels()
+        fig.legend(
+            [
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+            ],
+            [
+                'Test ep. #1',
+                'EDMD',
+                'Closed-loop Koop.',
+            ],
+            loc='lower left',
+            ncol=3,
+            bbox_to_anchor=(0, 0, 1, 1),
+            mode='expand',
+        )
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.16)
     elif plot_type == 'traj_test_ol':
         fig, ax = plt.subplots(
             3,
             1,
             sharex=True,
-            constrained_layout=True,
             figsize=(5, 5),
         )
         ax[0].plot(
@@ -852,21 +864,18 @@ def action_generate_paper_plots(
             X_test_ol_true[:, 0],
             color=OKABE_ITO['black'],
             linewidth=2,
-            label='Test episode #1',
         )
         ax[0].plot(
             t_test,
             Xp_test_ol_from_ol[:, 0],
             color=OKABE_ITO['orange'],
             linewidth=2,
-            label='Extended DMD',
         )
         ax[0].plot(
             t_test,
             Xp_test_ol_from_cl[:, 0],
             color=OKABE_ITO['sky blue'],
             linewidth=2,
-            label='Closed-loop Koop.',
         )
         ax[0].set_ylim([-1.5, 1.5])
         ax[1].plot(
@@ -900,8 +909,25 @@ def action_generate_paper_plots(
         ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
         ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
-        ax[0].legend(loc='upper right')
         fig.align_labels()
+        fig.legend(
+            [
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+            ],
+            [
+                'Test ep. #1',
+                'EDMD',
+                'Closed-loop Koop.',
+            ],
+            loc='lower left',
+            ncol=3,
+            bbox_to_anchor=(0, 0, 1, 1),
+            mode='expand',
+        )
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.16)
     elif plot_type == 'traj_train_cl':
         fig, ax = plt.subplots(7, 1)
         ax[0].plot(X_train_cl_true[:, 0], label='true')
@@ -997,7 +1023,8 @@ def action_generate_paper_plots(
                 'Extended DMD',
                 'Closed-loop Koop.',
             ],
-            loc='upper right',
+            loc='lower right',
+            bbox_to_anchor=(1.1, -0.15),
         )
     elif plot_type == 'eigvals_ol':
         # Create figure
@@ -1050,7 +1077,8 @@ def action_generate_paper_plots(
                 'Extended DMD',
                 'Closed-loop Koop.',
             ],
-            loc='upper right',
+            loc='lower right',
+            bbox_to_anchor=(1.1, -0.15),
         )
     else:
         raise ValueError('Invalid `plot_type`.')
