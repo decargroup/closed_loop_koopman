@@ -198,6 +198,8 @@ def task_generate_paper_plots():
         'traj_test_ol',
         'traj_train_cl',
         'traj_test_cl',
+        'inpt_train_cl',
+        'inpt_test_cl',
         'eigvals_cl',
         'eigvals_ol',
     ]
@@ -867,7 +869,7 @@ def action_generate_paper_plots(
     def _plot_traj_cl(t, X_cl_true, Xp_cl_from_cl, Xp_cl_from_ol):
         """Generate closed-loop trajectory plot."""
         fig, ax = plt.subplots(
-            7,
+            4,
             1,
             sharex=True,
             figsize=(5, 5),
@@ -944,41 +946,17 @@ def action_generate_paper_plots(
             color=OKABE_ITO['sky blue'],
             linewidth=2,
         )
-        ax[4].plot(
-            t,
-            X_cl_true[:, 4],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        ax[5].plot(
-            t,
-            X_cl_true[:, 5],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
-        ax[6].plot(
-            t,
-            X_cl_true[:, 6],
-            color=OKABE_ITO['black'],
-            linewidth=2,
-        )
         for a in np.ravel(ax):
             a.grid(linestyle='--')
         ax[0].set_ylim([-5, 5])
         ax[1].set_ylim([-3, 3])
         ax[2].set_ylim([-1.5, 1.5])
         ax[3].set_ylim([-0.25, 0.25])
-        # ax[4].set_ylim([-1, 1])
-        # ax[5].set_ylim([-0.25, 0.25])
-        # ax[6].set_ylim([-2, 2])
         ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$ (1)')
         ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$ (1)')
         ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
         ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
-        ax[4].set_ylabel(r'$r_1(t)$ (rad)')
-        ax[5].set_ylabel(r'$r_2(t)$ (rad)')
-        ax[6].set_ylabel(r'$f(t)$ (V)')
-        ax[6].set_xlabel(r'$t$ (s)')
+        ax[3].set_xlabel(r'$t$ (s)')
         fig.align_labels()
         fig.legend(
             [
@@ -998,6 +976,45 @@ def action_generate_paper_plots(
         )
         fig.tight_layout()
         fig.subplots_adjust(bottom=0.16)
+        return fig
+
+    def _plot_inpt_cl(t, X_cl_true, Xp_cl_from_cl, Xp_cl_from_ol):
+        """Generate closed-loop input plot."""
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            figsize=(5, 5),
+        )
+        ax[0].plot(
+            t,
+            X_cl_true[:, 4],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[1].plot(
+            t,
+            X_cl_true[:, 5],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        ax[2].plot(
+            t,
+            X_cl_true[:, 6],
+            color=OKABE_ITO['black'],
+            linewidth=2,
+        )
+        for a in np.ravel(ax):
+            a.grid(linestyle='--')
+        # ax[0].set_ylim([-1, 1])
+        # ax[1].set_ylim([-0.25, 0.25])
+        # ax[2].set_ylim([-2, 2])
+        ax[0].set_ylabel(r'$r_1(t)$ (rad)')
+        ax[1].set_ylabel(r'$r_2(t)$ (rad)')
+        ax[2].set_ylabel(r'$f(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        fig.align_labels()
+        fig.tight_layout()
         return fig
 
     def _plot_eigvals(eigvals_from_cl, eigvals_from_ol):
@@ -1081,6 +1098,20 @@ def action_generate_paper_plots(
         )
     elif plot_type == 'traj_test_cl':
         fig = _plot_traj_cl(
+            t_test,
+            X_test_cl_true,
+            Xp_test_cl_from_cl,
+            Xp_test_cl_from_ol,
+        )
+    elif plot_type == 'inpt_train_cl':
+        fig = _plot_inpt_cl(
+            t_train,
+            X_train_cl_true,
+            Xp_train_cl_from_cl,
+            Xp_train_cl_from_ol,
+        )
+    elif plot_type == 'inpt_test_cl':
+        fig = _plot_inpt_cl(
             t_test,
             X_test_cl_true,
             Xp_test_cl_from_cl,
