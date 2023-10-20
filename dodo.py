@@ -40,6 +40,15 @@ OKABE_ITO = {
     'grey': (0.60, 0.60, 0.60),
 }
 
+# Set LaTeX rendering only if available
+usetex = False
+# usetex = True if shutil.which('latex') else False
+if usetex:
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    # plt.rc('font', size=15)
+    plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
+
 
 def task_preprocess_experiments():
     """Pickle raw CSV files."""
@@ -842,7 +851,7 @@ def action_generate_paper_plots(
                 ax[0].get_lines()[2],
             ],
             [
-                'Test ep. #1',
+                r'Test ep. \#1',
                 'EDMD',
                 'Closed-loop Koop.',
             ],
@@ -978,7 +987,7 @@ def action_generate_paper_plots(
                 ax[0].get_lines()[2],
             ],
             [
-                'Test ep. #1',
+                r'Test ep. \#1',
                 'EDMD',
                 'Closed-loop Koop.',
             ],
