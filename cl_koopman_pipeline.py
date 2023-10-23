@@ -887,8 +887,8 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
         # Calculate EDMD ``H`` matrix with Tikhonov regulartizer
         _H = _H_unreg + (self.alpha * np.eye(_H_unreg.shape[0])) / q
         # Compute constant in LMI formulation of EDMD problem
-        _c = (Theta_p @ Theta_p.T) / q
-        c = picos.Constant('c', _c)
+        _F = (Theta_p @ Theta_p.T) / q
+        F = picos.Constant('F', _F)
         # Break up ``H`` matrix using LDL decomposition. Similar to Cholesky
         # decomposition but allows ``H`` to be positive semidefinite.
         _L, _D, _ = scipy.linalg.ldl(_H)
@@ -897,7 +897,7 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
         # Define closed-loop Koopman matrix as optimization variable
         U = picos.RealVariable('U', (Theta_p.shape[0], Psi.shape[0]))
         # Define slack variable
-        W = picos.SymmetricVariable('W', _c.shape)
+        W = picos.SymmetricVariable('W', _F.shape)
         # Define plant Koopman state space matrices as optimization variables
         Ap = picos.RealVariable('Ap', (n_x_p, n_x_p))
         Bp = picos.RealVariable('Bp', (n_x_p, n_u_p))
@@ -905,7 +905,7 @@ class ClEdmdConstrainedOpt(KoopmanRegressor):
         problem.add_constraint(W >> self.picos_eps_)
         problem.add_constraint(
             picos.block([
-                [-W + c - (G * U.T) - (U * G.T), U * R],
+                [-W + F - (G * U.T) - (U * G.T), U * R],
                 [R.T * U.T, -np.eye(_H.shape[0])],
             ]) << self.picos_eps_)
         # Break up closed-loop Koopman matrix and add constraints to compute
