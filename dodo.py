@@ -1140,7 +1140,7 @@ def action_score_predictions(
     exp_test = joblib.load(experiment_path_test_controller)
     pred = joblib.load(predictions_path)
     # Define metrics
-    metrics = ['explained_variance', 'neg_mean_squared_error', 'r2']
+    metrics = ['neg_mean_squared_error', 'r2']
     # Get the closed-loop episodes with training controller
     eps_train_cl_true = pykoop.split_episodes(
         exp_train['closed_loop']['X_test'],
@@ -1167,6 +1167,14 @@ def action_score_predictions(
         pred['Xp_test_cl_from_ol'],
         episode_feature=True,
     )
+    eps_train_ol_true = pykoop.split_episodes(
+        exp_train['open_loop']['X_test'],
+        episode_feature=True,
+    )
+    eps_train_ol_from_ol = pykoop.split_episodes(
+        pred['Xp_train_ol_from_ol'],
+        episode_feature=True,
+    )
     # Double-check number of episodes
     if len(eps_train_cl_true) != len(eps_test_cl_true):
         raise ValueError('Must have same number of episodes in test set for '
@@ -1179,6 +1187,7 @@ def action_score_predictions(
         scores_train_cl_from_ol = np.zeros((n_eps, ))
         scores_test_cl_from_cl = np.zeros((n_eps, ))
         scores_test_cl_from_ol = np.zeros((n_eps, ))
+        scores_train_ol_from_ol = np.zeros((n_eps, ))
         for i in range(n_eps):
             X_train_cl_true_i = eps_train_cl_true[i][1]
             X_train_cl_from_cl_i = eps_train_cl_from_cl[i][1]
@@ -1210,6 +1219,14 @@ def action_score_predictions(
                 regression_metric=metric,
                 episode_feature=False,
             )
+            X_train_ol_true_i = eps_train_ol_true[i][1]
+            X_train_ol_from_ol_i = eps_train_ol_from_ol[i][1]
+            scores_train_ol_from_ol[i] = pykoop.score_trajectory(
+                X_train_ol_from_ol_i,
+                X_train_ol_true_i[:, :X_train_ol_from_ol_i.shape[1]],
+                regression_metric=metric,
+                episode_feature=False,
+            )
         # If scores are finite, add them to the dict
         if all(np.isfinite(scores_train_cl_from_cl)):
             scores[f'{metric}__train__cl_from_cl'] = scores_train_cl_from_cl
@@ -1219,6 +1236,8 @@ def action_score_predictions(
             scores[f'{metric}__test__cl_from_cl'] = scores_test_cl_from_cl
         if all(np.isfinite(scores_test_cl_from_ol)):
             scores[f'{metric}__test__cl_from_ol'] = scores_test_cl_from_ol
+        if all(np.isfinite(scores_train_ol_from_ol)):
+            scores[f'{metric}__train__ol_from_ol'] = scores_train_ol_from_ol
     # Save score dict as CSV
     score_df = pandas.DataFrame.from_dict(scores)
     score_path.parent.mkdir(parents=True, exist_ok=True)
