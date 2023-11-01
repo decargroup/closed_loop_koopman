@@ -64,7 +64,13 @@ def main():
             X_test_i = dataset['open_loop']['X_train'][test_index, :]
             # Create pipeline
             kp = pykoop.KoopmanPipeline(
-                lifting_functions=lifting_functions,
+                lifting_functions=[(
+                    'split',
+                    pykoop.SplitPipeline(
+                        lifting_functions_state=lifting_functions,
+                        lifting_functions_input=None,
+                    ),
+                )],
                 regressor=pykoop.Edmd(alpha=alpha),
             )
             # Fit model
