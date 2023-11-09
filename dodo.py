@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 import optuna
 import pykoop
+import scipy.linalg
 import tomli
 from matplotlib import pyplot as plt
 
@@ -137,6 +138,36 @@ def task_run_cross_validation():
             'clean':
             True,
         }
+
+
+def task_run_regularizer_sweep():
+    """Sweep regularizer to see its effect on the spectral radius."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    spectral_radii = WD.joinpath(
+        'build',
+        'spectral_radii',
+        'spectral_radii.pickle',
+    )
+    return {
+        'actions': [(action_run_regularizer_sweep, (
+            experiment,
+            lifting_functions,
+            spectral_radii,
+        ))],
+        'file_dep': [experiment, lifting_functions],
+        'targets': [spectral_radii],
+        'clean':
+        True,
+    }
 
 
 def action_preprocess_experiments(
@@ -418,3 +449,100 @@ def action_run_cross_validation(
         return_code = p.wait()
         if return_code < 0:
             raise RuntimeError(f'Process {p.pid} returned code {return_code}.')
+
+
+def action_run_regularizer_sweep(
+    experiment_path: pathlib.Path,
+    lifting_functions_path: pathlib.Path,
+    spectral_radii_path: pathlib.Path,
+):
+    """Sweep regularizer to see its effect on the eigenvalues."""
+
+    experiment = joblib.load(experiment_path)
+    lifting_functions = joblib.load(lifting_functions_path)
+
+    def trial(alpha):
+        # Open-loop ID
+        kp_ol_from_ol = pykoop.KoopmanPipeline(
+            lifting_functions=[(
+                'split',
+                pykoop.SplitPipeline(
+                    lifting_functions_state=lifting_functions,
+                    lifting_functions_input=None,
+                ),
+            )],
+            regressor=pykoop.Edmd(alpha=alpha),
+        ).fit(
+            experiment['open_loop']['X_train'],
+            n_inputs=experiment['open_loop']['n_inputs'],
+            episode_feature=experiment['open_loop']['episode_feature'],
+        )
+        # Closed-loop ID
+        kp_cl_from_cl = cl_koopman_pipeline.ClKoopmanPipeline(
+            lifting_functions=lifting_functions,
+            regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+                alpha=alpha,
+                picos_eps=1e-6,
+                solver_params={'solver': 'mosek'},
+            ),
+            controller=experiment['closed_loop']['controller'],
+            C_plant=experiment['closed_loop']['C_plant'],
+        ).fit(
+            experiment['closed_loop']['X_train'],
+            n_inputs=experiment['closed_loop']['n_inputs'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )
+        # Get open-loop from closed-loop
+        kp_ol_from_cl = kp_cl_from_cl.kp_plant_
+        # Get closed-loop from open-loop
+        kp_cl_from_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+            kp_ol_from_ol,
+            controller=experiment['closed_loop']['controller'],
+            C_plant=experiment['closed_loop']['C_plant'],
+        ).fit(
+            experiment['closed_loop']['X_train'],
+            n_inputs=experiment['closed_loop']['n_inputs'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )
+        spectral_radii = [
+            _spectral_radius(kp_cl_from_cl),
+            _spectral_radius(kp_cl_from_ol),
+            _spectral_radius(kp_ol_from_cl),
+            _spectral_radius(kp_ol_from_ol),
+        ]
+        return spectral_radii
+
+    alpha = np.logspace(-3, 3, 180)
+    spectral_radii = np.array(
+        joblib.Parallel(n_jobs=1)(joblib.delayed(trial)(a) for a in alpha))
+    outputs = {
+        'alpha': alpha,
+        'spectral_radius': {
+            'kp_cl_from_cl': spectral_radii[:, 0],
+            'kp_cl_from_ol': spectral_radii[:, 1],
+            'kp_ol_from_cl': spectral_radii[:, 2],
+            'kp_ol_from_ol': spectral_radii[:, 3],
+        }
+    }
+    spectral_radii_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(outputs, spectral_radii_path)
+
+
+def _spectral_radius(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
+    """Compute spectral radius from a Koopman pipeline.
+
+    Parameters
+    ----------
+    koopman_pipeline : pykoop.KoopmanPipeline
+        Fit Koopman pipeline.
+
+    Returns
+    -------
+    float
+        Maximum eigenvalue of Koopman matrix.
+    """
+    U = koopman_pipeline.regressor_.coef_.T
+    A = U[:, :U.shape[0]]
+    eigs = scipy.linalg.eigvals(A)
+    max_eig = np.max(np.abs(eigs))
+    return max_eig
