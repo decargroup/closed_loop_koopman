@@ -22,7 +22,6 @@ pykoop.set_config(skip_validation=True)
 WD = pathlib.Path(__file__).parent.resolve()
 
 # Random seeds
-OPTUNA_TPE_SEED = 3501
 SKLEARN_SPLIT_SEED = 1234
 
 # Okabe-Ito colorscheme: https://jfly.uni-koeln.de/color/
@@ -395,9 +394,10 @@ def action_run_cross_validation(
     study_path.parent.mkdir(parents=True, exist_ok=True)
     # Create study and run optimization
     storage_url = f'sqlite:///{study_path.resolve()}'
+    search_space = {'alpha': np.logspace(-3, 3, 180)}
     optuna.create_study(
         storage=storage_url,
-        sampler=optuna.samplers.TPESampler(seed=OPTUNA_TPE_SEED),
+        sampler=optuna.samplers.GridSampler(search_space),
         pruner=optuna.pruners.ThresholdPruner(lower=-10),
         study_name=study_type,
         direction='maximize',
@@ -405,8 +405,6 @@ def action_run_cross_validation(
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
     # Set number of processes
     n_processes = 6
-    # Set number of trials per process
-    n_trials = 30
     # Spawn processes and wait for them all to complete
     processes = []
     for i in range(n_processes):
@@ -416,7 +414,6 @@ def action_run_cross_validation(
             experiment_path.resolve(),
             lifting_functions_path.resolve(),
             storage_url,
-            str(n_trials),
             str(SKLEARN_SPLIT_SEED),
         ])
         processes.append(p)

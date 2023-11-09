@@ -10,9 +10,6 @@ import sklearn.model_selection
 
 import cl_koopman_pipeline
 
-# Have ``pykoop`` skip validation for performance improvements
-pykoop.set_config(skip_validation=True)
-
 
 def main():
     """Run a closed-loop Optuna study."""
@@ -29,10 +26,6 @@ def main():
     parser.add_argument(
         'study_path',
         type=str,
-    )
-    parser.add_argument(
-        'n_trials',
-        type=int,
     )
     parser.add_argument(
         'sklearn_split_seed',
@@ -59,8 +52,8 @@ def main():
         # Run cross-validation
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
-            # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', low=0, high=1e3, log=False)
+            # Get hyperparameters from Optuna (true range set in ``dodo.py``)
+            alpha = trial.suggest_float('alpha', low=1e-12, high=1e12)
             # Train-test split
             X_train_i = dataset['closed_loop']['X_train'][train_index, :]
             X_test_i = dataset['closed_loop']['X_train'][test_index, :]
@@ -82,7 +75,8 @@ def main():
                 episode_feature=dataset['closed_loop']['episode_feature'],
             )
             # Predict closed-loop trajectory
-            X_pred = kp.predict_trajectory(X_test_i)
+            with pykoop.config_context(skip_validation=True):
+                X_pred = kp.predict_trajectory(X_test_i)
             # Score closed-loop trajectory
             r2_i = pykoop.score_trajectory(
                 X_pred,
@@ -103,7 +97,6 @@ def main():
     )
     study.optimize(
         objective,
-        n_trials=args.n_trials,
     )
 
 

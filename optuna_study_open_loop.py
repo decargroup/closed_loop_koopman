@@ -8,8 +8,7 @@ import optuna
 import pykoop
 import sklearn.model_selection
 
-# Have ``pykoop`` skip validation for performance improvements
-pykoop.set_config(skip_validation=True)
+import cl_koopman_pipeline
 
 
 def main():
@@ -27,10 +26,6 @@ def main():
     parser.add_argument(
         'study_path',
         type=str,
-    )
-    parser.add_argument(
-        'n_trials',
-        type=int,
     )
     parser.add_argument(
         'sklearn_split_seed',
@@ -57,13 +52,14 @@ def main():
         # Run cross-validation
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
-            # Get hyperparameters from Optuna
-            alpha = trial.suggest_float('alpha', low=0, high=1e3, log=False)
+            # Get hyperparameters from Optuna (true range set in ``dodo.py``)
+            alpha = trial.suggest_float('alpha', low=1e-12, high=1e12)
             # Train-test split
-            X_train_i = dataset['open_loop']['X_train'][train_index, :]
-            X_test_i = dataset['open_loop']['X_train'][test_index, :]
+            X_train_ol_i = dataset['open_loop']['X_train'][train_index, :]
+            X_train_cl_i = dataset['closed_loop']['X_train'][train_index, :]
+            X_test_cl_i = dataset['closed_loop']['X_train'][test_index, :]
             # Create pipeline
-            kp = pykoop.KoopmanPipeline(
+            kp_ol = pykoop.KoopmanPipeline(
                 lifting_functions=[(
                     'split',
                     pykoop.SplitPipeline(
@@ -74,19 +70,31 @@ def main():
                 regressor=pykoop.Edmd(alpha=alpha),
             )
             # Fit model
-            kp.fit(
-                X_train_i,
+            kp_ol.fit(
+                X_train_ol_i,
                 n_inputs=dataset['open_loop']['n_inputs'],
                 episode_feature=dataset['open_loop']['episode_feature'],
             )
+            # Get closed-loop model
+            kp_cl = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+                kp_ol,
+                controller=dataset['closed_loop']['controller'],
+                C_plant=dataset['closed_loop']['C_plant'],
+            )
+            kp_cl.fit(
+                X_train_cl_i,
+                n_inputs=dataset['closed_loop']['n_inputs'],
+                episode_feature=dataset['closed_loop']['episode_feature'],
+            )
             # Predict open-loop trajectory
-            X_pred = kp.predict_trajectory(X_test_i)
+            with pykoop.config_context(skip_validation=True):
+                X_pred = kp_cl.predict_trajectory(X_test_cl_i)
             # Score open-loop trajectory
             r2_i = pykoop.score_trajectory(
                 X_pred,
-                X_test_i[:, :X_pred.shape[1]],
+                X_test_cl_i[:, :X_pred.shape[1]],
                 regression_metric='r2',
-                episode_feature=dataset['open_loop']['episode_feature'],
+                episode_feature=dataset['closed_loop']['episode_feature'],
             )
             r2.append(r2_i)
             trial.report(r2_i, step=i)
@@ -101,7 +109,6 @@ def main():
     )
     study.optimize(
         objective,
-        n_trials=args.n_trials,
     )
 
 
