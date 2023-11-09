@@ -457,7 +457,6 @@ def action_run_regularizer_sweep(
     spectral_radii_path: pathlib.Path,
 ):
     """Sweep regularizer to see its effect on the eigenvalues."""
-
     experiment = joblib.load(experiment_path)
     lifting_functions = joblib.load(lifting_functions_path)
 
