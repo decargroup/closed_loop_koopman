@@ -52,8 +52,8 @@ def main():
         # Run cross-validation
         r2 = []
         for i, (train_index, test_index) in enumerate(gss_iter):
-            # Get hyperparameters from Optuna (true range set in ``dodo.py``)
-            alpha = trial.suggest_float('alpha', low=1e-12, high=1e12)
+            # Get hyperparameters from Optuna
+            alpha = trial.suggest_float('alpha', low=1e-3, high=1e3)
             # Train-test split
             X_train_i = dataset['closed_loop']['X_train'][train_index, :]
             X_test_i = dataset['closed_loop']['X_train'][test_index, :]
@@ -91,9 +91,12 @@ def main():
                 raise optuna.TrialPruned()
         return np.mean(r2)
 
+    search_space = {'alpha': np.logspace(-3, 3, 180)}
     study = optuna.load_study(
-        study_name=None,
         storage=args.study_path,
+        study_name=None,
+        sampler=optuna.samplers.GridSampler(search_space),
+        pruner=optuna.pruners.ThresholdPruner(lower=-10),
     )
     study.optimize(
         objective,

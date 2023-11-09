@@ -394,17 +394,14 @@ def action_run_cross_validation(
     study_path.parent.mkdir(parents=True, exist_ok=True)
     # Create study and run optimization
     storage_url = f'sqlite:///{study_path.resolve()}'
-    search_space = {'alpha': np.logspace(-3, 3, 180)}
     optuna.create_study(
         storage=storage_url,
-        sampler=optuna.samplers.GridSampler(search_space),
-        pruner=optuna.pruners.ThresholdPruner(lower=-10),
         study_name=study_type,
         direction='maximize',
     )
     script_path = WD.joinpath(f'optuna_study_{study_type}.py')
     # Set number of processes
-    n_processes = 6
+    n_processes = 8
     # Spawn processes and wait for them all to complete
     processes = []
     for i in range(n_processes):
