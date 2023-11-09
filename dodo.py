@@ -49,6 +49,7 @@ if usetex:
 
 def task_preprocess_experiments():
     """Pickle raw CSV files."""
+    # TODO Remove test controller if it's not used
     datasets = [
         ('controller_20230828', 'training_controller'),
         ('controller_20230915', 'test_controller'),
@@ -165,6 +166,36 @@ def task_run_regularizer_sweep():
         ))],
         'file_dep': [experiment, lifting_functions],
         'targets': [spectral_radii],
+        'clean':
+        True,
+    }
+
+
+def task_rewrap_controller():
+    """Extract open-loop system and re-wrap with controller, then predict."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    controller_rewrap = WD.joinpath(
+        'build',
+        'controller_rewrap',
+        'controller_rewrap.pickle',
+    )
+    return {
+        'actions': [(action_rewrap_controller, (
+            experiment,
+            lifting_functions,
+            controller_rewrap,
+        ))],
+        'file_dep': [experiment, lifting_functions],
+        'targets': [controller_rewrap],
         'clean':
         True,
     }
@@ -514,7 +545,7 @@ def action_run_regularizer_sweep(
     alpha = np.logspace(-3, 3, 180)
     spectral_radii = np.array(
         joblib.Parallel(n_jobs=1)(joblib.delayed(trial)(a) for a in alpha))
-    outputs = {
+    output = {
         'alpha': alpha,
         'spectral_radius': {
             'kp_cl_from_cl': spectral_radii[:, 0],
@@ -524,7 +555,106 @@ def action_run_regularizer_sweep(
         }
     }
     spectral_radii_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(outputs, spectral_radii_path)
+    joblib.dump(output, spectral_radii_path)
+
+
+def action_rewrap_controller(
+    experiment_path: pathlib.Path,
+    lifting_functions_path: pathlib.Path,
+    controller_rewrap_path: pathlib.Path,
+):
+    """Extract open-loop system and re-wrap with controller, then predict."""
+    experiment = joblib.load(experiment_path)
+    lifting_functions = joblib.load(lifting_functions_path)
+    kp_const = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lifting_functions,
+        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+            alpha=0,
+            picos_eps=1e-6,
+            solver_params={'solver': 'mosek'},
+        ),
+        controller=experiment['closed_loop']['controller'],
+        C_plant=experiment['closed_loop']['C_plant'],
+    ).fit(
+        experiment['closed_loop']['X_train'],
+        n_inputs=experiment['closed_loop']['n_inputs'],
+        episode_feature=experiment['closed_loop']['episode_feature'],
+    )
+    kp_const_rewrap = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_const.kp_plant_,
+        controller=experiment['closed_loop']['controller'],
+        C_plant=experiment['closed_loop']['C_plant'],
+    ).fit(
+        experiment['closed_loop']['X_train'],
+        n_inputs=experiment['closed_loop']['n_inputs'],
+        episode_feature=experiment['closed_loop']['episode_feature'],
+    )
+    kp_lstsq = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lifting_functions,
+        regressor=cl_koopman_pipeline.ClEdmdLeastSquares(alpha=0, ),
+        controller=experiment['closed_loop']['controller'],
+        C_plant=experiment['closed_loop']['C_plant'],
+    ).fit(
+        experiment['closed_loop']['X_train'],
+        n_inputs=experiment['closed_loop']['n_inputs'],
+        episode_feature=experiment['closed_loop']['episode_feature'],
+    )
+    kp_lstsq_rewrap = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp_lstsq.kp_plant_,
+        controller=experiment['closed_loop']['controller'],
+        C_plant=experiment['closed_loop']['C_plant'],
+    ).fit(
+        experiment['closed_loop']['X_train'],
+        n_inputs=experiment['closed_loop']['n_inputs'],
+        episode_feature=experiment['closed_loop']['episode_feature'],
+    )
+    output = {
+        'eigvals': {
+            'const': _eigvals(kp_const),
+            'const_rewrap': _eigvals(kp_const_rewrap),
+            'lstsq': _eigvals(kp_lstsq),
+            'lstsq_rewrap': _eigvals(kp_lstsq_rewrap),
+        },
+        'X_pred': {
+            'const': kp_const.predict_trajectory(
+                experiment['closed_loop']['X_test'],
+                episode_feature=experiment['closed_loop']['episode_feature'],
+            ),
+            'const_rewrap': kp_const_rewrap.predict_trajectory(
+                experiment['closed_loop']['X_test'],
+                episode_feature=experiment['closed_loop']['episode_feature'],
+            ),
+            'lstsq': kp_lstsq.predict_trajectory(
+                experiment['closed_loop']['X_test'],
+                episode_feature=experiment['closed_loop']['episode_feature'],
+            ),
+            'lstsq_rewrap': kp_lstsq_rewrap.predict_trajectory(
+                experiment['closed_loop']['X_test'],
+                episode_feature=experiment['closed_loop']['episode_feature'],
+            ),
+        },
+    }
+    controller_rewrap_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(output, controller_rewrap_path)
+
+
+def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
+    """Compute eigenvalues from a Koopman pipeline.
+
+    Parameters
+    ----------
+    koopman_pipeline : pykoop.KoopmanPipeline
+        Fit Koopman pipeline.
+
+    Returns
+    -------
+    float
+        Eigenvalues of Koopman matrix.
+    """
+    U = koopman_pipeline.regressor_.coef_.T
+    A = U[:, :U.shape[0]]
+    eigs = scipy.linalg.eigvals(A)
+    return eigs
 
 
 def _spectral_radius(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
@@ -540,8 +670,6 @@ def _spectral_radius(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
     float
         Maximum eigenvalue of Koopman matrix.
     """
-    U = koopman_pipeline.regressor_.coef_.T
-    A = U[:, :U.shape[0]]
-    eigs = scipy.linalg.eigvals(A)
+    eigs = _eigvals(koopman_pipeline)
     max_eig = np.max(np.abs(eigs))
     return max_eig
