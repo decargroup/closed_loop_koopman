@@ -543,8 +543,7 @@ def action_run_cross_validation(
         ]
         return mean_scores
 
-    alpha = np.logspace(-3, 3, 2)
-    # alpha = np.logspace(-3, 3, 180)
+    alpha = np.logspace(-3, 3, 180)
     scores = np.array(
         joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
     output = {
@@ -628,8 +627,7 @@ def action_run_regularizer_sweep(
         ]
         return spectral_radii
 
-    # alpha = np.logspace(-3, 3, 180)
-    alpha = np.logspace(-3, 3, 2)
+    alpha = np.logspace(-3, 3, 180)
     spectral_radii = np.array(
         joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
     output = {
