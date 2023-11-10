@@ -4,6 +4,7 @@ import pathlib
 import shutil
 import subprocess
 
+import collections
 import control
 import doit
 import joblib
@@ -11,6 +12,7 @@ import numpy as np
 import optuna
 import pykoop
 import scipy.linalg
+import sklearn.model_selection
 import tomli
 from matplotlib import pyplot as plt
 
@@ -114,31 +116,27 @@ def task_run_cross_validation():
         'experiments',
         'training_controller.pickle',
     )
-    for study_type in ['closed_loop', 'open_loop']:
-        lifting_functions = WD.joinpath(
-            'build',
-            'lifting_functions',
-            'lifting_functions.pickle',
-        )
-        study = WD.joinpath(
-            'build',
-            'studies',
-            f'{study_type}.db',
-        )
-        yield {
-            'name':
-            study_type,
-            'actions': [(action_run_cross_validation, (
-                experiment,
-                lifting_functions,
-                study,
-                study_type,
-            ))],
-            'file_dep': [experiment, lifting_functions],
-            'targets': [study],
-            'clean':
-            True,
-        }
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    cross_validation = WD.joinpath(
+        'build',
+        'cross_validation',
+        'cross_validation.pickle',
+    )
+    return {
+        'actions': [(action_run_cross_validation, (
+            experiment,
+            lifting_functions,
+            cross_validation,
+        ))],
+        'file_dep': [experiment, lifting_functions],
+        'targets': [cross_validation],
+        'clean':
+        True,
+    }
 
 
 def task_run_regularizer_sweep():
@@ -446,40 +444,126 @@ def action_save_lifting_functions(lifting_function_path: pathlib.Path, ):
 def action_run_cross_validation(
     experiment_path: pathlib.Path,
     lifting_functions_path: pathlib.Path,
-    study_path: pathlib.Path,
-    study_type: str,
+    cross_validation_path: pathlib.Path,
 ):
     """Run cross-validation."""
-    # Delete database file if it exists
-    study_path.unlink(missing_ok=True)
-    # Create directory for database if it does not already exist
-    study_path.parent.mkdir(parents=True, exist_ok=True)
-    # Create study and run optimization
-    storage_url = f'sqlite:///{study_path.resolve()}'
-    optuna.create_study(
-        storage=storage_url,
-        study_name=study_type,
-        direction='maximize',
-    )
-    script_path = WD.joinpath(f'optuna_study_{study_type}.py')
-    # Set number of processes
-    n_processes = 8
-    # Spawn processes and wait for them all to complete
-    processes = []
-    for i in range(n_processes):
-        p = subprocess.Popen([
-            'python',
-            script_path.resolve(),
-            experiment_path.resolve(),
-            lifting_functions_path.resolve(),
-            storage_url,
-            str(SKLEARN_SPLIT_SEED),
-        ])
-        processes.append(p)
-    for p in processes:
-        return_code = p.wait()
-        if return_code < 0:
-            raise RuntimeError(f'Process {p.pid} returned code {return_code}.')
+    exp = joblib.load(experiment_path)
+    lf = joblib.load(lifting_functions_path)
+
+    def trial(alpha):
+        """Run a trial for a single regularization coefficient."""
+        # Split data
+        gss = sklearn.model_selection.GroupShuffleSplit(
+            n_splits=3,
+            test_size=0.2,
+            random_state=SKLEARN_SPLIT_SEED,
+        )
+        gss_iter = gss.split(
+            exp['closed_loop']['X_train'],
+            groups=exp['closed_loop']['X_train'][:, 0],
+        )
+        scores = collections.defaultdict(list)
+        for i, (train_index, test_index) in enumerate(gss_iter):
+            X_train_cl = exp['closed_loop']['X_train'][train_index, :]
+            X_test_cl = exp['closed_loop']['X_train'][test_index, :]
+            X_train_ol = exp['open_loop']['X_train'][train_index, :]
+            X_test_ol = exp['open_loop']['X_train'][test_index, :]
+            kp = {}
+            # Open-loop ID
+            kp['ol_from_ol'] = pykoop.KoopmanPipeline(
+                lifting_functions=[(
+                    'split',
+                    pykoop.SplitPipeline(
+                        lifting_functions_state=lf,
+                        lifting_functions_input=None,
+                    ),
+                )],
+                regressor=pykoop.Edmd(alpha=alpha),
+            ).fit(
+                X_train_ol,
+                n_inputs=exp['open_loop']['n_inputs'],
+                episode_feature=exp['open_loop']['episode_feature'],
+            )
+            # Closed-loop ID
+            kp['cl_from_cl'] = cl_koopman_pipeline.ClKoopmanPipeline(
+                lifting_functions=lf,
+                regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+                    alpha=alpha,
+                    picos_eps=1e-6,
+                    solver_params={'solver': 'mosek'},
+                ),
+                controller=exp['closed_loop']['controller'],
+                C_plant=exp['closed_loop']['C_plant'],
+            ).fit(
+                X_train_cl,
+                n_inputs=exp['closed_loop']['n_inputs'],
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )
+            # Get open-loop from closed-loop
+            kp['ol_from_cl'] = kp['cl_from_cl'].kp_plant_
+            # Get closed-loop from open-loop
+            kp['cl_from_ol'] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(  # noqa: E501
+                kp['ol_from_ol'],
+                controller=exp['closed_loop']['controller'],
+                C_plant=exp['closed_loop']['C_plant'],
+            ).fit(
+                X_train_cl,
+                n_inputs=exp['closed_loop']['n_inputs'],
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )
+            Xp = {}
+            with pykoop.config_context(skip_validation=True):
+                for scenario in ['cl_from_cl', 'cl_from_ol']:
+                    Xp[scenario] = kp[scenario].predict_trajectory(X_test_cl)
+                    r2 = pykoop.score_trajectory(
+                        Xp[scenario],
+                        X_test_cl[:, :Xp[scenario].shape[1]],
+                        regression_metric='r2',
+                        episode_feature=exp['closed_loop']['episode_feature'],
+                    )
+                    scores[scenario].append(r2)
+                for scenario in ['ol_from_cl', 'ol_from_ol']:
+                    Xp[scenario] = kp[scenario].predict_trajectory(X_test_ol)
+                    r2 = pykoop.score_trajectory(
+                        Xp[scenario],
+                        X_test_ol[:, :Xp[scenario].shape[1]],
+                        regression_metric='r2',
+                        episode_feature=exp['closed_loop']['episode_feature'],
+                    )
+                    scores[scenario].append(r2)
+        mean_scores = [
+            np.mean(scores['cl_from_cl']),
+            np.mean(scores['cl_from_ol']),
+            np.mean(scores['ol_from_cl']),
+            np.mean(scores['ol_from_ol']),
+            np.std(scores['cl_from_cl']),
+            np.std(scores['cl_from_ol']),
+            np.std(scores['ol_from_cl']),
+            np.std(scores['ol_from_ol']),
+        ]
+        return mean_scores
+
+    alpha = np.logspace(-3, 3, 2)
+    # alpha = np.logspace(-3, 3, 180)
+    scores = np.array(
+        joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
+    output = {
+        'alpha': alpha,
+        'mean_score': {
+            'cl_from_cl': scores[:, 0],
+            'cl_from_ol': scores[:, 1],
+            'ol_from_cl': scores[:, 2],
+            'ol_from_ol': scores[:, 3],
+        },
+        'std_score': {
+            'cl_from_cl': scores[:, 4],
+            'cl_from_ol': scores[:, 5],
+            'ol_from_cl': scores[:, 6],
+            'ol_from_ol': scores[:, 7],
+        },
+    }
+    cross_validation_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(output, cross_validation_path)
 
 
 def action_run_regularizer_sweep(
@@ -488,61 +572,64 @@ def action_run_regularizer_sweep(
     spectral_radii_path: pathlib.Path,
 ):
     """Sweep regularizer to see its effect on the eigenvalues."""
-    experiment = joblib.load(experiment_path)
-    lifting_functions = joblib.load(lifting_functions_path)
+    exp = joblib.load(experiment_path)
+    lf = joblib.load(lifting_functions_path)
 
     def trial(alpha):
+        """Run a trial for a single regularization coefficient."""
         # Open-loop ID
-        kp_ol_from_ol = pykoop.KoopmanPipeline(
+        kp = {}
+        kp['ol_from_ol'] = pykoop.KoopmanPipeline(
             lifting_functions=[(
                 'split',
                 pykoop.SplitPipeline(
-                    lifting_functions_state=lifting_functions,
+                    lifting_functions_state=lf,
                     lifting_functions_input=None,
                 ),
             )],
             regressor=pykoop.Edmd(alpha=alpha),
         ).fit(
-            experiment['open_loop']['X_train'],
-            n_inputs=experiment['open_loop']['n_inputs'],
-            episode_feature=experiment['open_loop']['episode_feature'],
+            exp['open_loop']['X_train'],
+            n_inputs=exp['open_loop']['n_inputs'],
+            episode_feature=exp['open_loop']['episode_feature'],
         )
         # Closed-loop ID
-        kp_cl_from_cl = cl_koopman_pipeline.ClKoopmanPipeline(
-            lifting_functions=lifting_functions,
+        kp['cl_from_cl'] = cl_koopman_pipeline.ClKoopmanPipeline(
+            lifting_functions=lf,
             regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
                 alpha=alpha,
                 picos_eps=1e-6,
                 solver_params={'solver': 'mosek'},
             ),
-            controller=experiment['closed_loop']['controller'],
-            C_plant=experiment['closed_loop']['C_plant'],
+            controller=exp['closed_loop']['controller'],
+            C_plant=exp['closed_loop']['C_plant'],
         ).fit(
-            experiment['closed_loop']['X_train'],
-            n_inputs=experiment['closed_loop']['n_inputs'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            exp['closed_loop']['X_train'],
+            n_inputs=exp['closed_loop']['n_inputs'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )
         # Get open-loop from closed-loop
-        kp_ol_from_cl = kp_cl_from_cl.kp_plant_
+        kp['ol_from_cl'] = kp['cl_from_cl'].kp_plant_
         # Get closed-loop from open-loop
-        kp_cl_from_ol = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
-            kp_ol_from_ol,
-            controller=experiment['closed_loop']['controller'],
-            C_plant=experiment['closed_loop']['C_plant'],
+        kp['cl_from_ol'] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(  # noqa: E501
+            kp['ol_from_ol'],
+            controller=exp['closed_loop']['controller'],
+            C_plant=exp['closed_loop']['C_plant'],
         ).fit(
-            experiment['closed_loop']['X_train'],
-            n_inputs=experiment['closed_loop']['n_inputs'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            exp['closed_loop']['X_train'],
+            n_inputs=exp['closed_loop']['n_inputs'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )
         spectral_radii = [
-            _spectral_radius(kp_cl_from_cl),
-            _spectral_radius(kp_cl_from_ol),
-            _spectral_radius(kp_ol_from_cl),
-            _spectral_radius(kp_ol_from_ol),
+            _spectral_radius(kp['cl_from_cl']),
+            _spectral_radius(kp['cl_from_ol']),
+            _spectral_radius(kp['ol_from_cl']),
+            _spectral_radius(kp['ol_from_ol']),
         ]
         return spectral_radii
 
-    alpha = np.logspace(-3, 3, 180)
+    # alpha = np.logspace(-3, 3, 180)
+    alpha = np.logspace(-3, 3, 2)
     spectral_radii = np.array(
         joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
     output = {
@@ -616,19 +703,23 @@ def action_rewrap_controller(
             'lstsq_rewrap': _eigvals(kp_lstsq_rewrap),
         },
         'X_pred': {
-            'const': kp_const.predict_trajectory(
+            'const':
+            kp_const.predict_trajectory(
                 experiment['closed_loop']['X_test'],
                 episode_feature=experiment['closed_loop']['episode_feature'],
             ),
-            'const_rewrap': kp_const_rewrap.predict_trajectory(
+            'const_rewrap':
+            kp_const_rewrap.predict_trajectory(
                 experiment['closed_loop']['X_test'],
                 episode_feature=experiment['closed_loop']['episode_feature'],
             ),
-            'lstsq': kp_lstsq.predict_trajectory(
+            'lstsq':
+            kp_lstsq.predict_trajectory(
                 experiment['closed_loop']['X_test'],
                 episode_feature=experiment['closed_loop']['episode_feature'],
             ),
-            'lstsq_rewrap': kp_lstsq_rewrap.predict_trajectory(
+            'lstsq_rewrap':
+            kp_lstsq_rewrap.predict_trajectory(
                 experiment['closed_loop']['X_test'],
                 episode_feature=experiment['closed_loop']['episode_feature'],
             ),
