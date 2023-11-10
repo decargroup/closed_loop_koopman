@@ -544,14 +544,14 @@ def action_run_regularizer_sweep(
 
     alpha = np.logspace(-3, 3, 180)
     spectral_radii = np.array(
-        joblib.Parallel(n_jobs=1)(joblib.delayed(trial)(a) for a in alpha))
+        joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
     output = {
         'alpha': alpha,
         'spectral_radius': {
-            'kp_cl_from_cl': spectral_radii[:, 0],
-            'kp_cl_from_ol': spectral_radii[:, 1],
-            'kp_ol_from_cl': spectral_radii[:, 2],
-            'kp_ol_from_ol': spectral_radii[:, 3],
+            'cl_from_cl': spectral_radii[:, 0],
+            'cl_from_ol': spectral_radii[:, 1],
+            'ol_from_cl': spectral_radii[:, 2],
+            'ol_from_ol': spectral_radii[:, 3],
         }
     }
     spectral_radii_path.parent.mkdir(parents=True, exist_ok=True)
