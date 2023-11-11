@@ -1,10 +1,10 @@
 """Define and automate tasks with ``doit``."""
 
+import collections
 import pathlib
 import shutil
 import subprocess
 
-import collections
 import control
 import doit
 import joblib
@@ -462,7 +462,8 @@ def action_run_cross_validation(
             exp['closed_loop']['X_train'],
             groups=exp['closed_loop']['X_train'][:, 0],
         )
-        scores = collections.defaultdict(list)
+        r2_score = collections.defaultdict(list)
+        mean_squared_error = collections.defaultdict(list)
         for i, (train_index, test_index) in enumerate(gss_iter):
             X_train_cl = exp['closed_loop']['X_train'][train_index, :]
             X_test_cl = exp['closed_loop']['X_train'][test_index, :]
@@ -515,31 +516,57 @@ def action_run_cross_validation(
             with pykoop.config_context(skip_validation=True):
                 for scenario in ['cl_from_cl', 'cl_from_ol']:
                     Xp[scenario] = kp[scenario].predict_trajectory(X_test_cl)
-                    r2 = pykoop.score_trajectory(
-                        Xp[scenario],
-                        X_test_cl[:, :Xp[scenario].shape[1]],
-                        regression_metric='r2',
-                        episode_feature=exp['closed_loop']['episode_feature'],
-                    )
-                    scores[scenario].append(r2)
+                    r2_score[scenario].append(
+                        pykoop.score_trajectory(
+                            Xp[scenario],
+                            X_test_cl[:, :Xp[scenario].shape[1]],
+                            regression_metric='r2',
+                            episode_feature=exp['closed_loop']
+                            ['episode_feature'],
+                        ))
+                    mean_squared_error[scenario].append(
+                        -1 * pykoop.score_trajectory(
+                            Xp[scenario],
+                            X_test_cl[:, :Xp[scenario].shape[1]],
+                            regression_metric='neg_mean_squared_error',
+                            episode_feature=exp['closed_loop']
+                            ['episode_feature'],
+                        ))
                 for scenario in ['ol_from_cl', 'ol_from_ol']:
                     Xp[scenario] = kp[scenario].predict_trajectory(X_test_ol)
-                    r2 = pykoop.score_trajectory(
-                        Xp[scenario],
-                        X_test_ol[:, :Xp[scenario].shape[1]],
-                        regression_metric='r2',
-                        episode_feature=exp['closed_loop']['episode_feature'],
-                    )
-                    scores[scenario].append(r2)
+                    r2_score[scenario].append(
+                        pykoop.score_trajectory(
+                            Xp[scenario],
+                            X_test_ol[:, :Xp[scenario].shape[1]],
+                            regression_metric='r2',
+                            episode_feature=exp['open_loop']
+                            ['episode_feature'],
+                        ))
+                    mean_squared_error[scenario].append(
+                        -1 * pykoop.score_trajectory(
+                            Xp[scenario],
+                            X_test_ol[:, :Xp[scenario].shape[1]],
+                            regression_metric='neg_mean_squared_error',
+                            episode_feature=exp['open_loop']
+                            ['episode_feature'],
+                        ))
         mean_scores = [
-            np.mean(scores['cl_from_cl']),
-            np.mean(scores['cl_from_ol']),
-            np.mean(scores['ol_from_cl']),
-            np.mean(scores['ol_from_ol']),
-            np.std(scores['cl_from_cl']),
-            np.std(scores['cl_from_ol']),
-            np.std(scores['ol_from_cl']),
-            np.std(scores['ol_from_ol']),
+            np.mean(r2_score['cl_from_cl']),
+            np.mean(r2_score['cl_from_ol']),
+            np.mean(r2_score['ol_from_cl']),
+            np.mean(r2_score['ol_from_ol']),
+            np.std(r2_score['cl_from_cl']),
+            np.std(r2_score['cl_from_ol']),
+            np.std(r2_score['ol_from_cl']),
+            np.std(r2_score['ol_from_ol']),
+            np.mean(mean_squared_error['cl_from_cl']),
+            np.mean(mean_squared_error['cl_from_ol']),
+            np.mean(mean_squared_error['ol_from_cl']),
+            np.mean(mean_squared_error['ol_from_ol']),
+            np.std(mean_squared_error['cl_from_cl']),
+            np.std(mean_squared_error['cl_from_ol']),
+            np.std(mean_squared_error['ol_from_cl']),
+            np.std(mean_squared_error['ol_from_ol']),
         ]
         return mean_scores
 
@@ -548,17 +575,29 @@ def action_run_cross_validation(
         joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
     output = {
         'alpha': alpha,
-        'mean_score': {
+        'r2_mean': {
             'cl_from_cl': scores[:, 0],
             'cl_from_ol': scores[:, 1],
             'ol_from_cl': scores[:, 2],
             'ol_from_ol': scores[:, 3],
         },
-        'std_score': {
+        'r2_std': {
             'cl_from_cl': scores[:, 4],
             'cl_from_ol': scores[:, 5],
             'ol_from_cl': scores[:, 6],
             'ol_from_ol': scores[:, 7],
+        },
+        'mse_mean': {
+            'cl_from_cl': scores[:, 8],
+            'cl_from_ol': scores[:, 9],
+            'ol_from_cl': scores[:, 10],
+            'ol_from_ol': scores[:, 11],
+        },
+        'mse_std': {
+            'cl_from_cl': scores[:, 12],
+            'cl_from_ol': scores[:, 13],
+            'ol_from_cl': scores[:, 14],
+            'ol_from_ol': scores[:, 15],
         },
     }
     cross_validation_path.parent.mkdir(parents=True, exist_ok=True)
