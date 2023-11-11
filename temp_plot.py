@@ -26,8 +26,10 @@ def main():
             'cross_validation',
             'cross_validation.pickle',
         ))
-    r2 = cross_validation['mean_score']
-    std = cross_validation['std_score']
+    r2_mean = cross_validation['r2_mean']
+    r2_std = cross_validation['r2_std']
+    mse_mean = cross_validation['mse_mean']
+    mse_std = cross_validation['mse_std']
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, eigs['cl_from_ol'], label='EDMD')
@@ -47,12 +49,12 @@ def main():
 
     fig, ax = plt.subplots()
     # ax.semilogx(alpha, r2['cl_from_ol'], label='EDMD')
-    ax.errorbar(alpha, r2['cl_from_ol'], label='EDMD', yerr=std['cl_from_ol'])
+    ax.errorbar(alpha, r2_mean['cl_from_ol'], label='EDMD', yerr=r2_std['cl_from_ol'])
     ax.errorbar(
         alpha,
-        r2['cl_from_cl'],
+        r2_mean['cl_from_cl'],
         label='CL Koop.',
-        yerr=std['cl_from_cl'],
+        yerr=r2_std['cl_from_cl'],
     )
     ax.set_xscale('log')
     ax.grid(ls='--')
@@ -61,12 +63,12 @@ def main():
     ax.set_title('CL R2 Score')
 
     fig, ax = plt.subplots()
-    ax.errorbar(alpha, r2['ol_from_ol'], label='EDMD', yerr=std['ol_from_ol'])
+    ax.errorbar(alpha, r2_mean['ol_from_ol'], label='EDMD', yerr=r2_std['ol_from_ol'])
     ax.errorbar(
         alpha,
-        r2['ol_from_cl'],
+        r2_mean['ol_from_cl'],
         label='CL Koop.',
-        yerr=std['ol_from_cl'],
+        yerr=r2_std['ol_from_cl'],
     )
     ax.set_xscale('log')
     ax.grid(ls='--')
@@ -74,19 +76,19 @@ def main():
     # ax.set_ylim([-2, 1])
     ax.set_title('OL R2 Score')
 
-    # fig, ax = plt.subplots()
-    # ax.semilogx(alpha, -1 * mse['cl_from_ol'], label='EDMD')
-    # ax.semilogx(alpha, -1 * mse['cl_from_cl'], label='CL Koop.')
-    # ax.grid(ls='--')
-    # ax.legend(loc='upper right')
-    # ax.set_title('CL MSE')
+    fig, ax = plt.subplots()
+    ax.semilogx(alpha, mse_mean['cl_from_ol'], label='EDMD')
+    ax.semilogx(alpha, mse_mean['cl_from_cl'], label='CL Koop.')
+    ax.grid(ls='--')
+    ax.legend(loc='upper right')
+    ax.set_title('CL MSE')
 
-    # fig, ax = plt.subplots()
-    # ax.semilogx(alpha, -1 * mse['ol_from_ol'], label='EDMD')
-    # ax.semilogx(alpha, -1 * mse['ol_from_cl'], label='CL Koop.')
-    # ax.grid(ls='--')
-    # ax.legend(loc='upper right')
-    # ax.set_title('OL MSE')
+    fig, ax = plt.subplots()
+    ax.semilogx(alpha, mse_mean['ol_from_ol'], label='EDMD')
+    ax.semilogx(alpha, mse_mean['ol_from_cl'], label='CL Koop.')
+    ax.grid(ls='--')
+    ax.legend(loc='upper right')
+    ax.set_title('OL MSE')
 
     rewrap_controller = joblib.load(
         WD.joinpath(
