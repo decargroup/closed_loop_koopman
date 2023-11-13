@@ -31,64 +31,86 @@ def main():
     mse_mean = cross_validation['mse_mean']
     mse_std = cross_validation['mse_std']
 
+    bal = {
+        key: alpha[np.nanargmax(r2_mean[key])]
+        for key in ['cl_from_cl', 'cl_from_ol', 'ol_from_cl', 'ol_from_ol']
+    }
+    print(bal)
+
     fig, ax = plt.subplots()
     ax.semilogx(alpha, eigs['cl_from_ol'], label='EDMD')
     ax.semilogx(alpha, eigs['cl_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     # ax.set_ylim([0, 1.1])
     ax.set_title('CL Spectral Radius')
+    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
+    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
+    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
+    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
+    ax.set_ylabel('Spectral radius')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, eigs['ol_from_ol'], label='EDMD')
     ax.semilogx(alpha, eigs['ol_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     # ax.set_ylim([0, 1.1])
     ax.set_title('OL Spectral Radius')
+    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
+    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
+    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
+    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
+    ax.set_ylabel('Spectral radius')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     fig, ax = plt.subplots()
     # ax.semilogx(alpha, r2['cl_from_ol'], label='EDMD')
-    ax.errorbar(alpha, r2_mean['cl_from_ol'], label='EDMD', yerr=r2_std['cl_from_ol'])
-    ax.errorbar(
-        alpha,
-        r2_mean['cl_from_cl'],
-        label='CL Koop.',
-        yerr=r2_std['cl_from_cl'],
-    )
-    ax.set_xscale('log')
+    ax.semilogx(alpha, r2_mean['cl_from_ol'], label='EDMD')
+    ax.semilogx(alpha, r2_mean['cl_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     # ax.set_ylim([-2, 1])
     ax.set_title('CL R2 Score')
+    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
+    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
+    ax.set_ylabel('R2 score')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     fig, ax = plt.subplots()
-    ax.errorbar(alpha, r2_mean['ol_from_ol'], label='EDMD', yerr=r2_std['ol_from_ol'])
-    ax.errorbar(
-        alpha,
-        r2_mean['ol_from_cl'],
-        label='CL Koop.',
-        yerr=r2_std['ol_from_cl'],
-    )
-    ax.set_xscale('log')
+    ax.semilogx(alpha, r2_mean['ol_from_ol'], label='EDMD')
+    ax.semilogx(alpha, r2_mean['ol_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     # ax.set_ylim([-2, 1])
     ax.set_title('OL R2 Score')
+    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
+    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
+    ax.set_ylabel('R2 score')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, mse_mean['cl_from_ol'], label='EDMD')
     ax.semilogx(alpha, mse_mean['cl_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     ax.set_title('CL MSE')
+    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
+    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
+    ax.set_ylabel('MSE')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, mse_mean['ol_from_ol'], label='EDMD')
     ax.semilogx(alpha, mse_mean['ol_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
-    ax.legend(loc='upper right')
     ax.set_title('OL MSE')
+    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
+    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
+    ax.set_ylabel('MSE')
+    ax.set_xlabel('alpha')
+    ax.legend(loc='upper right')
 
     rewrap_controller = joblib.load(
         WD.joinpath(
