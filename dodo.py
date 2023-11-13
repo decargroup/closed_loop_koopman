@@ -3,13 +3,11 @@
 import collections
 import pathlib
 import shutil
-import subprocess
 
 import control
 import doit
 import joblib
 import numpy as np
-import optuna
 import pykoop
 import scipy.linalg
 import sklearn.model_selection
@@ -134,6 +132,42 @@ def task_run_cross_validation():
         ))],
         'file_dep': [experiment, lifting_functions],
         'targets': [cross_validation],
+        'clean':
+        True,
+    }
+
+
+def task_run_prediction():
+    """Run prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    cross_validation = WD.joinpath(
+        'build',
+        'cross_validation',
+        'cross_validation.pickle',
+    )
+    prediction = WD.joinpath(
+        'build',
+        'prediction',
+        'prediction.pickle',
+    )
+    return {
+        'actions': [(action_run_prediction, (
+            experiment,
+            lifting_functions,
+            cross_validation,
+            prediction,
+        ))],
+        'file_dep': [experiment, lifting_functions, cross_validation],
+        'targets': [prediction],
         'clean':
         True,
     }
@@ -602,6 +636,89 @@ def action_run_cross_validation(
     }
     cross_validation_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(output, cross_validation_path)
+
+
+def action_run_prediction(
+    experiment_path: pathlib.Path,
+    lifting_functions_path: pathlib.Path,
+    cross_validation_path: pathlib.Path,
+    prediction_path: pathlib.Path,
+):
+    """Run prediction for all test episodes."""
+    # Load dependencies
+    exp = joblib.load(experiment_path)
+    lf = joblib.load(lifting_functions_path)
+    cv = joblib.load(cross_validation_path)
+    # Load training and test data
+    X_train_cl = exp['closed_loop']['X_train']
+    X_test_cl = exp['closed_loop']['X_test']
+    X_train_ol = exp['open_loop']['X_train']
+    X_test_ol = exp['open_loop']['X_test']
+    X_test = {
+        'cl_from_cl': X_test_cl,
+        'cl_from_ol': X_test_cl,
+        'ol_from_cl': X_test_ol,
+        'ol_from_ol': X_test_ol,
+    }
+    # Compute best regularization coefficients
+    best_alpha = {
+        key: cv['alpha'][np.nanargmax(value)]
+        for (key, value) in cv['r2_mean'].items()
+    }
+    # Fit pipelines
+    kp = {}
+    # Open-loop ID
+    kp['ol_from_ol'] = pykoop.KoopmanPipeline(
+        lifting_functions=[(
+            'split',
+            pykoop.SplitPipeline(
+                lifting_functions_state=lf,
+                lifting_functions_input=None,
+            ),
+        )],
+        regressor=pykoop.Edmd(alpha=best_alpha['cl_from_ol']),
+    ).fit(
+        X_train_ol,
+        n_inputs=exp['open_loop']['n_inputs'],
+        episode_feature=exp['open_loop']['episode_feature'],
+    )
+    # Closed-loop ID
+    kp['cl_from_cl'] = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lf,
+        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+            alpha=best_alpha['cl_from_cl'],
+            picos_eps=1e-6,
+            solver_params={'solver': 'mosek'},
+        ),
+        controller=exp['closed_loop']['controller'],
+        C_plant=exp['closed_loop']['C_plant'],
+    ).fit(
+        X_train_cl,
+        n_inputs=exp['closed_loop']['n_inputs'],
+        episode_feature=exp['closed_loop']['episode_feature'],
+    )
+    # Get open-loop from closed-loop
+    kp['ol_from_cl'] = kp['cl_from_cl'].kp_plant_
+    # Get closed-loop from open-loop
+    kp['cl_from_ol'] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+        kp['ol_from_ol'],
+        controller=exp['closed_loop']['controller'],
+        C_plant=exp['closed_loop']['C_plant'],
+    ).fit(
+        X_train_cl,
+        n_inputs=exp['closed_loop']['n_inputs'],
+        episode_feature=exp['closed_loop']['episode_feature'],
+    )
+    # Predict trajectories
+    Xp = {}
+    for scenario in ['cl_from_cl', 'cl_from_ol', 'ol_from_cl', 'ol_from_ol']:
+        Xp[scenario] = kp[scenario].predict_trajectory(X_test[scenario])
+    predictions = {
+        'X_test': X_test,
+        'Xp': Xp,
+    }
+    prediction_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(predictions, prediction_path)
 
 
 def action_run_regularizer_sweep(
