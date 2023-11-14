@@ -607,7 +607,7 @@ def action_run_cross_validation(
 
     alpha = np.logspace(-3, 3, 180)
     scores = np.array(
-        joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
+        joblib.Parallel(n_jobs=12)(joblib.delayed(trial)(a) for a in alpha))
     output = {
         'alpha': alpha,
         'r2_mean': {
@@ -799,7 +799,7 @@ def action_run_regularizer_sweep(
 
     alpha = np.logspace(-3, 3, 180)
     spectral_radii = np.array(
-        joblib.Parallel(n_jobs=6)(joblib.delayed(trial)(a) for a in alpha))
+        joblib.Parallel(n_jobs=12)(joblib.delayed(trial)(a) for a in alpha))
     output = {
         'alpha': alpha,
         'spectral_radius': {
