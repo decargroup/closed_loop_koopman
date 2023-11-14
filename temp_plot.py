@@ -26,6 +26,11 @@ def main():
             'cross_validation',
             'cross_validation.pickle',
         ))
+    p = joblib.load(WD.joinpath(
+        'build',
+        'prediction',
+        'prediction.pickle',
+    ))
     r2_mean = cross_validation['r2_mean']
     r2_std = cross_validation['r2_std']
     mse_mean = cross_validation['mse_mean']
@@ -36,6 +41,78 @@ def main():
         for key in ['cl_from_cl', 'cl_from_ol', 'ol_from_cl', 'ol_from_ol']
     }
     print(bal)
+
+    i = 2
+    eps_test = {
+        key: pykoop.split_episodes(value, True)
+        for (key, value) in p['X_test'].items()
+    }
+    eps_pred = {
+        key: pykoop.split_episodes(value, True)
+        for (key, value) in p['Xp'].items()
+    }
+
+    scores = {
+        'cl_from_cl': [],
+        'cl_from_ol': [],
+    }
+    n_eps = len(eps_test['cl_from_cl'])
+    for i in range(n_eps):
+        for t in ['cl_from_cl', 'cl_from_ol']:
+            a = pykoop.score_trajectory(
+                eps_pred[t][i][1],
+                eps_test[t][i][1][:, :4],
+                regression_metric='r2',
+                episode_feature=False,
+            )
+            scores[t].append(a)
+    print('cl_from_cl')
+    print(np.mean(scores['cl_from_cl']))
+    print(np.std(scores['cl_from_cl']))
+    print('cl_from_ol')
+    print(np.mean(scores['cl_from_ol']))
+    print(np.std(scores['cl_from_ol']))
+
+    fig, ax = plt.subplots()
+    ax.boxplot(
+        np.vstack((
+            scores['cl_from_cl'],
+            scores['cl_from_ol'],
+        )).T,
+        # whis=(0, 100),
+    )
+
+    X_test = {
+        key: value[0][1] for (key, value) in eps_test.items()
+    }
+    Xp = {
+        key: value[0][1] for (key, value) in eps_pred.items()
+    }
+
+    fig, ax = plt.subplots(4, 1)
+    ax[0].plot(X_test['cl_from_cl'][:, 0], '--')
+    ax[1].plot(X_test['cl_from_cl'][:, 1], '--')
+    ax[2].plot(X_test['cl_from_cl'][:, 2], '--')
+    ax[3].plot(X_test['cl_from_cl'][:, 3], '--')
+    ax[0].plot(Xp['cl_from_cl'][:, 0])
+    ax[1].plot(Xp['cl_from_cl'][:, 1])
+    ax[2].plot(Xp['cl_from_cl'][:, 2])
+    ax[3].plot(Xp['cl_from_cl'][:, 3])
+    ax[0].plot(Xp['cl_from_ol'][:, 0])
+    ax[1].plot(Xp['cl_from_ol'][:, 1])
+    ax[2].plot(Xp['cl_from_ol'][:, 2])
+    ax[3].plot(Xp['cl_from_ol'][:, 3])
+
+    fig, ax = plt.subplots(2, 1)
+    ax[0].plot(X_test['ol_from_ol'][:, 0], '--')
+    ax[1].plot(X_test['ol_from_ol'][:, 1], '--')
+    ax[0].plot(Xp['ol_from_cl'][:, 0])
+    ax[1].plot(Xp['ol_from_cl'][:, 1])
+    ax[0].plot(Xp['ol_from_ol'][:, 0])
+    ax[1].plot(Xp['ol_from_ol'][:, 1])
+
+    plt.show()
+    exit()
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, eigs['cl_from_ol'], label='EDMD')

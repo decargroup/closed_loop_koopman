@@ -711,9 +711,10 @@ def action_run_prediction(
     )
     # Predict trajectories
     Xp = {}
-    for scenario in ['cl_from_cl', 'cl_from_ol', 'ol_from_cl', 'ol_from_ol']:
+    for scenario in kp.keys():
         Xp[scenario] = kp[scenario].predict_trajectory(X_test[scenario])
     predictions = {
+        'kp': kp,
         'X_test': X_test,
         'Xp': Xp,
     }
