@@ -3,6 +3,7 @@
 import collections
 import pathlib
 import shutil
+from typing import Any, Dict
 
 import control
 import doit
@@ -660,59 +661,71 @@ def action_run_prediction(
         'ol_from_cl': X_test_ol,
         'ol_from_ol': X_test_ol,
     }
+
+    def _rename_key(key):
+        """Rename ``x_from_y`` to ``x_score_y_reg``."""
+        tokens = key.split('_')
+        return '_'.join([tokens[0], 'score', tokens[2], 'reg'])
+
     # Compute best regularization coefficients
     best_alpha = {
-        key: cv['alpha'][np.nanargmax(value)]
+        _rename_key(key): cv['alpha'][np.nanargmax(value)]
         for (key, value) in cv['r2_mean'].items()
     }
     # Fit pipelines
-    kp = {}
-    # Open-loop ID
-    kp['ol_from_ol'] = pykoop.KoopmanPipeline(
-        lifting_functions=[(
-            'split',
-            pykoop.SplitPipeline(
-                lifting_functions_state=lf,
-                lifting_functions_input=None,
+    kp: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
+    # Fit pipelines with OL reg
+    for sr in ['cl_score_ol_reg', 'ol_score_ol_reg']:
+        # Open-loop ID
+        kp['ol_from_ol'][sr] = pykoop.KoopmanPipeline(
+            lifting_functions=[(
+                'split',
+                pykoop.SplitPipeline(
+                    lifting_functions_state=lf,
+                    lifting_functions_input=None,
+                ),
+            )],
+            regressor=pykoop.Edmd(alpha=best_alpha[sr]),
+        ).fit(
+            X_train_ol,
+            n_inputs=exp['open_loop']['n_inputs'],
+            episode_feature=exp['open_loop']['episode_feature'],
+        )
+        # Get closed-loop from open-loop
+        kp['cl_from_ol'][
+            sr] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(  # noqa: E501
+                kp['ol_from_ol'][sr],
+                controller=exp['closed_loop']['controller'],
+                C_plant=exp['closed_loop']['C_plant'],
+            ).fit(
+                X_train_cl,
+                n_inputs=exp['closed_loop']['n_inputs'],
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )
+    # Fit pipelines with CL reg
+    for sr in ['cl_score_cl_reg', 'ol_score_cl_reg']:
+        # Closed-loop ID
+        kp['cl_from_cl'][sr] = cl_koopman_pipeline.ClKoopmanPipeline(
+            lifting_functions=lf,
+            regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+                alpha=best_alpha[sr],
+                picos_eps=1e-6,
+                solver_params={'solver': 'mosek'},
             ),
-        )],
-        regressor=pykoop.Edmd(alpha=best_alpha['cl_from_ol']),
-    ).fit(
-        X_train_ol,
-        n_inputs=exp['open_loop']['n_inputs'],
-        episode_feature=exp['open_loop']['episode_feature'],
-    )
-    # Closed-loop ID
-    kp['cl_from_cl'] = cl_koopman_pipeline.ClKoopmanPipeline(
-        lifting_functions=lf,
-        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
-            alpha=best_alpha['cl_from_cl'],
-            picos_eps=1e-6,
-            solver_params={'solver': 'mosek'},
-        ),
-        controller=exp['closed_loop']['controller'],
-        C_plant=exp['closed_loop']['C_plant'],
-    ).fit(
-        X_train_cl,
-        n_inputs=exp['closed_loop']['n_inputs'],
-        episode_feature=exp['closed_loop']['episode_feature'],
-    )
-    # Get open-loop from closed-loop
-    kp['ol_from_cl'] = kp['cl_from_cl'].kp_plant_
-    # Get closed-loop from open-loop
-    kp['cl_from_ol'] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
-        kp['ol_from_ol'],
-        controller=exp['closed_loop']['controller'],
-        C_plant=exp['closed_loop']['C_plant'],
-    ).fit(
-        X_train_cl,
-        n_inputs=exp['closed_loop']['n_inputs'],
-        episode_feature=exp['closed_loop']['episode_feature'],
-    )
+            controller=exp['closed_loop']['controller'],
+            C_plant=exp['closed_loop']['C_plant'],
+        ).fit(
+            X_train_cl,
+            n_inputs=exp['closed_loop']['n_inputs'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )
+        # Get open-loop from closed-loop
+        kp['ol_from_cl'][sr] = kp['cl_from_cl'][sr].kp_plant_
     # Predict trajectories
-    Xp = {}
-    for scenario in kp.keys():
-        Xp[scenario] = kp[scenario].predict_trajectory(X_test[scenario])
+    Xp: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
+    for est in kp.keys():
+        for sr in kp[est].keys():
+            Xp[est][sr] = kp[est][sr].predict_trajectory(X_test[est])
     predictions = {
         'kp': kp,
         'X_test': X_test,
