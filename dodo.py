@@ -234,6 +234,68 @@ def task_rewrap_controller():
     }
 
 
+def task_plot_paper_figures():
+    """Plot paper figures."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    lifting_functions = WD.joinpath(
+        'build',
+        'lifting_functions',
+        'lifting_functions.pickle',
+    )
+    cross_validation = WD.joinpath(
+        'build',
+        'cross_validation',
+        'cross_validation.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions',
+        'predictions.pickle',
+    )
+    spectral_radii = WD.joinpath(
+        'build',
+        'spectral_radii',
+        'spectral_radii.pickle',
+    )
+    controller_rewrap = WD.joinpath(
+        'build',
+        'controller_rewrap',
+        'controller_rewrap.pickle',
+    )
+    figures = [
+        WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
+    ]
+    for figure in figures:
+        yield {
+            'name':
+            figure.stem,
+            'actions': [(action_plot_paper_figures, (
+                experiment,
+                lifting_functions,
+                cross_validation,
+                predictions,
+                spectral_radii,
+                controller_rewrap,
+                figure,
+            ))],
+            'file_dep': [
+                experiment,
+                lifting_functions,
+                cross_validation,
+                predictions,
+                spectral_radii,
+                controller_rewrap,
+            ],
+            'targets': [figure],
+            'clean':
+            True,
+        }
+
+
 def action_preprocess_experiments(
     dataset_path: pathlib.Path,
     experiment_path: pathlib.Path,
@@ -895,6 +957,43 @@ def action_rewrap_controller(
     }
     controller_rewrap_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(output, controller_rewrap_path)
+
+
+def action_plot_paper_figures(
+    experiment_path: pathlib.Path,
+    lifting_functions_path: pathlib.Path,
+    cross_validation_path: pathlib.Path,
+    predictions_path: pathlib.Path,
+    spectral_radii_path: pathlib.Path,
+    controller_rewrap_path: pathlib.Path,
+    figure_path: pathlib.Path,
+):
+    """Plot paper figures."""
+    # Load data
+    experiment = joblib.load(experiment_path)
+    lifting_functions = joblib.load(lifting_functions_path)
+    cross_validation = joblib.load(cross_validation_path)
+    predictions = joblib.load(predictions_path)
+    spectral_radii = joblib.load(spectral_radii_path)
+    controller_rewrap = joblib.load(controller_rewrap_path)
+    # Create output directory
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    # Plot figure
+    if figure_path.stem == 'spectral_radius_ol':
+        fig, ax = plt.subplots()
+        alpha = spectral_radii['alpha']
+        sr = spectral_radii['spectral_radius']
+        ax.semilogx(alpha, sr['ol_from_ol'], label='EDMD')
+        ax.semilogx(alpha, sr['ol_from_cl'], label='CL EDMD')
+        ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{p})|$')
+        ax.set_xlabel(r'$\alpha$')
+        ax.legend(loc='upper right')
+        ax.grid(ls='--')
+    else:
+        raise ValueError('Invalid `figure_path`.')
+    # Save figure
+    fig.savefig(figure_path)
+    plt.close(fig)
 
 
 def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
