@@ -157,8 +157,8 @@ def task_run_prediction():
     )
     prediction = WD.joinpath(
         'build',
-        'prediction',
-        'prediction.pickle',
+        'predictions',
+        'predictions.pickle',
     )
     return {
         'actions': [(action_run_prediction, (
@@ -643,7 +643,7 @@ def action_run_prediction(
     experiment_path: pathlib.Path,
     lifting_functions_path: pathlib.Path,
     cross_validation_path: pathlib.Path,
-    prediction_path: pathlib.Path,
+    predictions_path: pathlib.Path,
 ):
     """Run prediction for all test episodes."""
     # Load dependencies
@@ -731,8 +731,8 @@ def action_run_prediction(
         'X_test': X_test,
         'Xp': Xp,
     }
-    prediction_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(predictions, prediction_path)
+    predictions_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(predictions, predictions_path)
 
 
 def action_run_regularizer_sweep(
