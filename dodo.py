@@ -296,6 +296,7 @@ def task_plot_paper_figures():
         'controller_rewrap.pickle',
     )
     figures = [
+        WD.joinpath('build', 'paper_figures', 'spectral_radius_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
     ]
     for figure in figures:
@@ -1059,7 +1060,17 @@ def action_plot_paper_figures(
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     # Plot figure
-    if figure_path.stem == 'spectral_radius_ol':
+    if figure_path.stem == 'spectral_radius_cl':
+        fig, ax = plt.subplots()
+        alpha = spectral_radii['alpha']
+        sr = spectral_radii['spectral_radius']
+        ax.semilogx(alpha, sr['cl_from_ol'], label='EDMD')
+        ax.semilogx(alpha, sr['cl_from_cl'], label='CL EDMD')
+        ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{f})|$')
+        ax.set_xlabel(r'$\alpha$')
+        ax.legend(loc='upper right')
+        ax.grid(ls='--')
+    elif figure_path.stem == 'spectral_radius_ol':
         fig, ax = plt.subplots()
         alpha = spectral_radii['alpha']
         sr = spectral_radii['spectral_radius']
