@@ -40,9 +40,6 @@ def main():
         'scores.pickle',
     ))
 
-    print(scores['r2']['cl_score_cl_reg']['cl_from_cl'])
-    exit()
-
     fig, ax = plt.subplots()
     ax.boxplot(
         np.vstack((

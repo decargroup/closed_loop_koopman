@@ -298,6 +298,8 @@ def task_plot_paper_figures():
     figures = [
         WD.joinpath('build', 'paper_figures', 'spectral_radius_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'cross_validation_cl.pdf'),
+        WD.joinpath('build', 'paper_figures', 'cross_validation_ol.pdf'),
     ]
     for figure in figures:
         yield {
@@ -855,12 +857,13 @@ def action_score_prediction(
             r2_list = []
             mse_list = []
             for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
-                r2_list.append(pykoop.score_trajectory(
-                    X_pred_i,
-                    X_test_i[:, :X_pred_i.shape[1]],
-                    regression_metric='r2',
-                    episode_feature=False,
-                ))
+                r2_list.append(
+                    pykoop.score_trajectory(
+                        X_pred_i,
+                        X_test_i[:, :X_pred_i.shape[1]],
+                        regression_metric='r2',
+                        episode_feature=False,
+                    ))
                 mse_list.append(-1 * pykoop.score_trajectory(
                     X_pred_i,
                     X_test_i[:, :X_pred_i.shape[1]],
@@ -1064,8 +1067,18 @@ def action_plot_paper_figures(
         fig, ax = plt.subplots()
         alpha = spectral_radii['alpha']
         sr = spectral_radii['spectral_radius']
-        ax.semilogx(alpha, sr['cl_from_ol'], label='EDMD')
-        ax.semilogx(alpha, sr['cl_from_cl'], label='CL EDMD')
+        ax.semilogx(
+            alpha,
+            sr['cl_from_ol'],
+            color=OKABE_ITO['sky blue'],
+            label='EDMD',
+        )
+        ax.semilogx(
+            alpha,
+            sr['cl_from_cl'],
+            color=OKABE_ITO['orange'],
+            label='CL EDMD',
+        )
         ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{f})|$')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
@@ -1074,9 +1087,59 @@ def action_plot_paper_figures(
         fig, ax = plt.subplots()
         alpha = spectral_radii['alpha']
         sr = spectral_radii['spectral_radius']
-        ax.semilogx(alpha, sr['ol_from_ol'], label='EDMD')
-        ax.semilogx(alpha, sr['ol_from_cl'], label='CL EDMD')
+        ax.semilogx(
+            alpha,
+            sr['ol_from_ol'],
+            color=OKABE_ITO['sky blue'],
+            label='EDMD',
+        )
+        ax.semilogx(
+            alpha,
+            sr['ol_from_cl'],
+            color=OKABE_ITO['orange'],
+            label='CL EDMD',
+        )
         ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{p})|$')
+        ax.set_xlabel(r'$\alpha$')
+        ax.legend(loc='upper right')
+        ax.grid(ls='--')
+    elif figure_path.stem == 'cross_validation_cl':
+        fig, ax = plt.subplots()
+        alpha = cross_validation['alpha']
+        r2 = cross_validation['r2_mean']
+        ax.semilogx(
+            alpha,
+            r2['cl_from_ol'],
+            color=OKABE_ITO['sky blue'],
+            label='EDMD',
+        )
+        ax.semilogx(
+            alpha,
+            r2['cl_from_cl'],
+            color=OKABE_ITO['orange'],
+            label='CL EDMD',
+        )
+        ax.set_ylabel(r'$R^2$ score')
+        ax.set_xlabel(r'$\alpha$')
+        ax.legend(loc='upper right')
+        ax.grid(ls='--')
+    elif figure_path.stem == 'cross_validation_ol':
+        fig, ax = plt.subplots()
+        alpha = cross_validation['alpha']
+        r2 = cross_validation['r2_mean']
+        ax.semilogx(
+            alpha,
+            r2['ol_from_ol'],
+            color=OKABE_ITO['sky blue'],
+            label='EDMD',
+        )
+        ax.semilogx(
+            alpha,
+            r2['ol_from_cl'],
+            color=OKABE_ITO['orange'],
+            label='CL EDMD',
+        )
+        ax.set_ylabel(r'$R^2$ score')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
