@@ -155,7 +155,7 @@ def task_run_prediction():
         'cross_validation',
         'cross_validation.pickle',
     )
-    prediction = WD.joinpath(
+    predictions = WD.joinpath(
         'build',
         'predictions',
         'predictions.pickle',
@@ -165,12 +165,41 @@ def task_run_prediction():
             experiment,
             lifting_functions,
             cross_validation,
-            prediction,
+            predictions,
         ))],
         'file_dep': [experiment, lifting_functions, cross_validation],
-        'targets': [prediction],
+        'targets': [predictions],
         'clean':
         True,
+    }
+
+
+def task_score_prediction():
+    """Score prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions',
+        'predictions.pickle',
+    )
+    scores = WD.joinpath(
+        'build',
+        'scores',
+        'scores.pickle',
+    )
+    return {
+        'actions': [(action_score_prediction, (
+            experiment,
+            predictions,
+            scores,
+        ))],
+        'file_dep': [experiment, predictions],
+        'targets': [scores],
+        'clean': True,
     }
 
 
@@ -795,6 +824,57 @@ def action_run_prediction(
     }
     predictions_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(predictions, predictions_path)
+
+
+def action_score_prediction(
+    experiment_path: pathlib.Path,
+    predictions_path: pathlib.Path,
+    scores_path: pathlib.Path,
+):
+    """Score prediction for all test episodes."""
+    exp = joblib.load(experiment_path)
+    pred = joblib.load(predictions_path)
+    # Get shared episode feature
+    episode_feature = exp['closed_loop']['episode_feature']
+    if exp['open_loop']['episode_feature'] != episode_feature:
+        raise ValueError('Open- and closed-loop episode features differ.')
+    # Score all the scenarios
+    r2: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
+    mse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
+    for x_score_y_reg in pred['Xp'].keys():
+        for x_from_y in pred['Xp'][x_score_y_reg].keys():
+            eps_test = pykoop.split_episodes(
+                pred['X_test'][x_from_y],
+                episode_feature=episode_feature,
+            )
+            eps_pred = pykoop.split_episodes(
+                pred['Xp'][x_score_y_reg][x_from_y],
+                episode_feature=episode_feature,
+            )
+            r2_list = []
+            mse_list = []
+            for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
+                r2_list.append(pykoop.score_trajectory(
+                    X_pred_i,
+                    X_test_i[:, :X_pred_i.shape[1]],
+                    regression_metric='r2',
+                    episode_feature=False,
+                ))
+                mse_list.append(-1 * pykoop.score_trajectory(
+                    X_pred_i,
+                    X_test_i[:, :X_pred_i.shape[1]],
+                    regression_metric='neg_mean_squared_error',
+                    episode_feature=False,
+                ))
+            r2[x_score_y_reg][x_from_y] = np.array(r2_list)
+            mse[x_score_y_reg][x_from_y] = np.array(mse_list)
+    # Save scores
+    scores = {
+        'r2': r2,
+        'mse': mse,
+    }
+    scores_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scores, scores_path)
 
 
 def action_run_regularizer_sweep(
