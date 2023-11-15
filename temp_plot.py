@@ -34,6 +34,32 @@ def main():
     r2_mean = cross_validation['r2_mean']
     mse_mean = cross_validation['mse_mean']
 
+    scores = joblib.load(WD.joinpath(
+        'build',
+        'scores',
+        'scores.pickle',
+    ))
+
+    print(scores['r2']['cl_score_cl_reg']['cl_from_cl'])
+    exit()
+
+    fig, ax = plt.subplots()
+    ax.boxplot(
+        np.vstack((
+            scores['r2']['cl_score_cl_reg']['cl_from_cl'],
+            scores['r2']['cl_score_ol_reg']['cl_from_ol'],
+            scores['r2']['ol_score_cl_reg']['cl_from_cl'],
+            scores['r2']['ol_score_ol_reg']['cl_from_ol'],
+        )).T,
+        whis=(0, 100),
+        labels=[
+            'cl_score_cl_reg',
+            'cl_score_ol_reg',
+            'ol_score_cl_reg',
+            'ol_score_ol_reg',
+        ],
+    )
+
     X_test = {
         key: pykoop.split_episodes(value, True)[0][1]
         for (key, value) in p['X_test'].items()
