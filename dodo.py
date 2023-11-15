@@ -300,6 +300,26 @@ def task_plot_paper_figures():
         WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'cross_validation_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'cross_validation_ol.pdf'),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_eig_lstsq.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_eig_const.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_pred_lstsq.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_pred_const.pdf',
+        ),
     ]
     for figure in figures:
         yield {
@@ -1143,6 +1163,71 @@ def action_plot_paper_figures(
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
+    elif figure_path.stem == 'controller_rewrap_eig_lstsq':
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
+        ax.plot(
+            theta,
+            np.ones(theta.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        ev_const = controller_rewrap['eigvals']['lstsq']
+        ev_new_const = controller_rewrap['eigvals']['lstsq_rewrap']
+        ax.scatter(
+            np.angle(ev_const),
+            np.abs(ev_const),
+        )
+        ax.scatter(
+            np.angle(ev_new_const),
+            np.abs(ev_new_const),
+            marker='.',
+        )
+    elif figure_path.stem == 'controller_rewrap_eig_const':
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
+        ax.plot(
+            theta,
+            np.ones(theta.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        ev_const = controller_rewrap['eigvals']['const']
+        ev_new_const = controller_rewrap['eigvals']['const_rewrap']
+        ax.scatter(
+            np.angle(ev_const),
+            np.abs(ev_const),
+        )
+        ax.scatter(
+            np.angle(ev_new_const),
+            np.abs(ev_new_const),
+            marker='.',
+        )
+    elif figure_path.stem == 'controller_rewrap_pred_lstsq':
+        ep = 0
+        fig, ax = plt.subplots(4, 1)
+        X_test = pykoop.split_episodes(
+            experiment['closed_loop']['X_test'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        X_pred_lstsq = pykoop.split_episodes(
+            controller_rewrap['X_pred']['lstsq'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        X_pred_lstsq_rewrap = pykoop.split_episodes(
+            controller_rewrap['X_pred']['lstsq_rewrap'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        for i in range(ax.shape[0]):
+            ax[i].plot(X_test[:, i])
+            ax[i].plot(X_pred_lstsq[:, i])
+            ax[i].plot(X_pred_lstsq_rewrap[:, i])
+    elif figure_path.stem == 'controller_rewrap_pred_const':
+        fig, ax = plt.subplots(4, 1)
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
