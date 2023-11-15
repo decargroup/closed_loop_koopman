@@ -28,111 +28,56 @@ def main():
         ))
     p = joblib.load(WD.joinpath(
         'build',
-        'prediction',
-        'prediction.pickle',
+        'predictions',
+        'predictions.pickle',
     ))
     r2_mean = cross_validation['r2_mean']
     mse_mean = cross_validation['mse_mean']
 
-    eps_test = {
-        key: pykoop.split_episodes(value, True)
+    X_test = {
+        key: pykoop.split_episodes(value, True)[0][1]
         for (key, value) in p['X_test'].items()
     }
-    eps_cl_from_cl = {
-        key: pykoop.split_episodes(value, True)
-        for (key, value) in p['Xp']['cl_from_cl'].items()
+    Xp_cl_score_cl_reg = {
+        key: pykoop.split_episodes(value, True)[0][1]
+        for (key, value) in p['Xp']['cl_score_cl_reg'].items()
     }
-    eps_cl_from_ol = {
-        key: pykoop.split_episodes(value, True)
-        for (key, value) in p['Xp']['cl_from_ol'].items()
+    Xp_cl_score_ol_reg = {
+        key: pykoop.split_episodes(value, True)[0][1]
+        for (key, value) in p['Xp']['cl_score_ol_reg'].items()
     }
-
-    eps_ol_from_cl = {
-        key: pykoop.split_episodes(value, True)
-        for (key, value) in p['Xp']['ol_from_cl'].items()
+    Xp_ol_score_cl_reg = {
+        key: pykoop.split_episodes(value, True)[0][1]
+        for (key, value) in p['Xp']['ol_score_cl_reg'].items()
     }
-    eps_ol_from_ol = {
-        key: pykoop.split_episodes(value, True)
-        for (key, value) in p['Xp']['ol_from_ol'].items()
-    }
-
-    X_test = {
-        key: value[0][1] for (key, value) in eps_test.items()
-    }
-    Xp_cl_from_cl = {
-        key: value[0][1] for (key, value) in eps_cl_from_cl.items()
-    }
-    Xp_cl_from_ol = {
-        key: value[0][1] for (key, value) in eps_cl_from_ol.items()
-    }
-    Xp_ol_from_cl = {
-        key: value[0][1] for (key, value) in eps_ol_from_cl.items()
-    }
-    Xp_ol_from_ol = {
-        key: value[0][1] for (key, value) in eps_ol_from_ol.items()
+    Xp_ol_score_ol_reg = {
+        key: pykoop.split_episodes(value, True)[0][1]
+        for (key, value) in p['Xp']['ol_score_ol_reg'].items()
     }
 
     fig, ax = plt.subplots(4, 1)
-    ax[0].plot(X_test['cl_from_cl'][:, 0], '--')
-    ax[1].plot(X_test['cl_from_cl'][:, 1], '--')
-    ax[2].plot(X_test['cl_from_cl'][:, 2], '--')
-    ax[3].plot(X_test['cl_from_cl'][:, 3], '--')
-    ax[0].plot(Xp_cl_from_cl['cl_score_cl_reg'][:, 0])
-    ax[1].plot(Xp_cl_from_cl['cl_score_cl_reg'][:, 1])
-    ax[2].plot(Xp_cl_from_cl['cl_score_cl_reg'][:, 2])
-    ax[3].plot(Xp_cl_from_cl['cl_score_cl_reg'][:, 3])
-
-    ax[0].plot(Xp_cl_from_cl['ol_score_cl_reg'][:, 0])
-    ax[1].plot(Xp_cl_from_cl['ol_score_cl_reg'][:, 1])
-    ax[2].plot(Xp_cl_from_cl['ol_score_cl_reg'][:, 2])
-    ax[3].plot(Xp_cl_from_cl['ol_score_cl_reg'][:, 3])
-
-    ax[0].plot(Xp_cl_from_ol['cl_score_ol_reg'][:, 0])
-    ax[1].plot(Xp_cl_from_ol['cl_score_ol_reg'][:, 1])
-    ax[2].plot(Xp_cl_from_ol['cl_score_ol_reg'][:, 2])
-    ax[3].plot(Xp_cl_from_ol['cl_score_ol_reg'][:, 3])
-
-    ax[0].plot(Xp_cl_from_ol['ol_score_ol_reg'][:, 0])
-    ax[1].plot(Xp_cl_from_ol['ol_score_ol_reg'][:, 1])
-    ax[2].plot(Xp_cl_from_ol['ol_score_ol_reg'][:, 2])
-    ax[3].plot(Xp_cl_from_ol['ol_score_ol_reg'][:, 3])
-    ax[0].set_ylim([-5, 5])
-    ax[1].set_ylim([-5, 5])
-    ax[2].set_ylim([-2, 2])
-    ax[3].set_ylim([-1, 1])
+    for i, a in enumerate(ax.ravel()):
+        a.plot(X_test['cl_from_cl'][:, i])
+        a.plot(Xp_cl_score_cl_reg['cl_from_cl'][:, i], label='cl_score_cl_reg')
+        a.plot(Xp_cl_score_ol_reg['cl_from_ol'][:, i], label='cl_score_ol_reg')
+        a.plot(Xp_ol_score_cl_reg['cl_from_cl'][:, i], label='ol_score_cl_reg')
+        a.plot(Xp_ol_score_ol_reg['cl_from_ol'][:, i], label='ol_score_ol_reg')
+    ax[0].set_ylim([-3, 3])
+    ax[1].set_ylim([-3, 3])
+    ax[2].set_ylim([-1.5, 1.5])
+    ax[3].set_ylim([-0.5, 0.5])
+    ax[0].legend()
 
     fig, ax = plt.subplots(2, 1)
-    ax[0].plot(X_test['cl_from_cl'][:, 0], '--')
-    ax[1].plot(X_test['cl_from_cl'][:, 1], '--')
-
-    ax[0].plot(Xp_ol_from_cl['cl_score_cl_reg'][:, 0])
-    ax[1].plot(Xp_ol_from_cl['cl_score_cl_reg'][:, 1])
-
-    ax[0].plot(Xp_ol_from_cl['ol_score_cl_reg'][:, 0])
-    ax[1].plot(Xp_ol_from_cl['ol_score_cl_reg'][:, 1])
-
-    ax[0].plot(Xp_ol_from_ol['cl_score_ol_reg'][:, 0])
-    ax[1].plot(Xp_ol_from_ol['cl_score_ol_reg'][:, 1])
-
-    ax[0].plot(Xp_ol_from_ol['ol_score_ol_reg'][:, 0])
-    ax[1].plot(Xp_ol_from_ol['ol_score_ol_reg'][:, 1])
-
-    ax[0].set_ylim([-4, 4])
-    ax[1].set_ylim([-2, 2])
-
-    plt.show()
-    exit()
-
-    fig, ax = plt.subplots(2, 1)
-    ax[0].plot(X_test['ol_from_ol'][:, 0], '--')
-    ax[1].plot(X_test['ol_from_ol'][:, 1], '--')
-    ax[0].plot(Xp_cl_from_cl['ol_from_cl'][:, 0])
-    ax[1].plot(Xp_cl_from_cl['ol_from_cl'][:, 1])
-    ax[0].plot(Xp_cl_from_cl['ol_from_ol'][:, 0])
-    ax[1].plot(Xp_cl_from_cl['ol_from_ol'][:, 1])
-
-    plt.show()
-    exit()
+    for i, a in enumerate(ax.ravel()):
+        a.plot(X_test['ol_from_cl'][:, i])
+        a.plot(Xp_cl_score_cl_reg['ol_from_cl'][:, i], label='cl_score_cl_reg')
+        a.plot(Xp_cl_score_ol_reg['ol_from_ol'][:, i], label='cl_score_ol_reg')
+        a.plot(Xp_ol_score_cl_reg['ol_from_cl'][:, i], label='ol_score_cl_reg')
+        a.plot(Xp_ol_score_ol_reg['ol_from_ol'][:, i], label='ol_score_ol_reg')
+    ax[0].set_ylim([-1.5, 1.5])
+    ax[1].set_ylim([-0.5, 0.5])
+    ax[0].legend()
 
     fig, ax = plt.subplots()
     ax.semilogx(alpha, eigs['cl_from_ol'], label='EDMD')
@@ -140,10 +85,6 @@ def main():
     ax.grid(ls='--')
     # ax.set_ylim([0, 1.1])
     ax.set_title('CL Spectral Radius')
-    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
-    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
-    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
-    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
     ax.set_ylabel('Spectral radius')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
@@ -154,10 +95,6 @@ def main():
     ax.grid(ls='--')
     # ax.set_ylim([0, 1.1])
     ax.set_title('OL Spectral Radius')
-    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
-    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
-    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
-    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
     ax.set_ylabel('Spectral radius')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
@@ -169,8 +106,6 @@ def main():
     ax.grid(ls='--')
     # ax.set_ylim([-2, 1])
     ax.set_title('CL R2 Score')
-    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
-    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
     ax.set_ylabel('R2 score')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
@@ -181,8 +116,6 @@ def main():
     ax.grid(ls='--')
     # ax.set_ylim([-2, 1])
     ax.set_title('OL R2 Score')
-    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
-    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
     ax.set_ylabel('R2 score')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
@@ -195,8 +128,6 @@ def main():
     ax.semilogx(alpha, mse_mean['cl_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
     ax.set_title('CL MSE')
-    ax.axvline(x=bal['cl_from_cl'], ls='--', color='r', label='cl_from_cl')
-    ax.axvline(x=bal['cl_from_ol'], ls='--', color='g', label='cl_from_ol')
     ax.set_ylabel('MSE')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
@@ -206,8 +137,6 @@ def main():
     ax.semilogx(alpha, mse_mean['ol_from_cl'], label='CL Koop.')
     ax.grid(ls='--')
     ax.set_title('OL MSE')
-    ax.axvline(x=bal['ol_from_cl'], ls='--', color='b', label='ol_from_cl')
-    ax.axvline(x=bal['ol_from_ol'], ls='--', color='k', label='ol_from_ol')
     ax.set_ylabel('MSE')
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
