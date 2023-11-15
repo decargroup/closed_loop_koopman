@@ -677,7 +677,7 @@ def action_run_prediction(
     # Fit pipelines with OL reg
     for sr in ['cl_score_ol_reg', 'ol_score_ol_reg']:
         # Open-loop ID
-        kp['ol_from_ol'][sr] = pykoop.KoopmanPipeline(
+        kp[sr]['ol_from_ol'] = pykoop.KoopmanPipeline(
             lifting_functions=[(
                 'split',
                 pykoop.SplitPipeline(
@@ -692,9 +692,9 @@ def action_run_prediction(
             episode_feature=exp['open_loop']['episode_feature'],
         )
         # Get closed-loop from open-loop
-        kp['cl_from_ol'][
-            sr] = cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(  # noqa: E501
-                kp['ol_from_ol'][sr],
+        kp[sr]['cl_from_ol'] = \
+            cl_koopman_pipeline.ClKoopmanPipeline.from_ol_pipeline(
+                kp[sr]['ol_from_ol'],
                 controller=exp['closed_loop']['controller'],
                 C_plant=exp['closed_loop']['C_plant'],
             ).fit(
@@ -705,7 +705,7 @@ def action_run_prediction(
     # Fit pipelines with CL reg
     for sr in ['cl_score_cl_reg', 'ol_score_cl_reg']:
         # Closed-loop ID
-        kp['cl_from_cl'][sr] = cl_koopman_pipeline.ClKoopmanPipeline(
+        kp[sr]['cl_from_cl'] = cl_koopman_pipeline.ClKoopmanPipeline(
             lifting_functions=lf,
             regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
                 alpha=best_alpha[sr],
@@ -720,12 +720,12 @@ def action_run_prediction(
             episode_feature=exp['closed_loop']['episode_feature'],
         )
         # Get open-loop from closed-loop
-        kp['ol_from_cl'][sr] = kp['cl_from_cl'][sr].kp_plant_
+        kp[sr]['ol_from_cl'] = kp[sr]['cl_from_cl'].kp_plant_
     # Predict trajectories
     Xp: Dict[str, Dict[str, Any]] = collections.defaultdict(dict)
-    for est in kp.keys():
-        for sr in kp[est].keys():
-            Xp[est][sr] = kp[est][sr].predict_trajectory(X_test[est])
+    for sr in kp.keys():
+        for est in kp[sr].keys():
+            Xp[sr][est] = kp[sr][est].predict_trajectory(X_test[est])
     predictions = {
         'kp': kp,
         'X_test': X_test,
