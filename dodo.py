@@ -1078,28 +1078,28 @@ def action_plot_paper_figures(
 ):
     """Plot paper figures."""
     # Load data
-    experiment = joblib.load(experiment_path)
-    lifting_functions = joblib.load(lifting_functions_path)
-    cross_validation = joblib.load(cross_validation_path)
-    predictions = joblib.load(predictions_path)
-    spectral_radii = joblib.load(spectral_radii_path)
-    controller_rewrap = joblib.load(controller_rewrap_path)
+    exp = joblib.load(experiment_path)
+    lf = joblib.load(lifting_functions_path)
+    cv = joblib.load(cross_validation_path)
+    pred = joblib.load(predictions_path)
+    spect_rad = joblib.load(spectral_radii_path)
+    cont_rewrap = joblib.load(controller_rewrap_path)
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     # Plot figure
     if figure_path.stem == 'spectral_radius_cl':
         fig, ax = plt.subplots()
-        alpha = spectral_radii['alpha']
-        sr = spectral_radii['spectral_radius']
+        alpha = spect_rad['alpha']
+        spect_rad = spect_rad['spectral_radius']
         ax.semilogx(
             alpha,
-            sr['cl_from_ol'],
+            spect_rad['cl_from_ol'],
             color=OKABE_ITO['sky blue'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
-            sr['cl_from_cl'],
+            spect_rad['cl_from_cl'],
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
@@ -1109,17 +1109,17 @@ def action_plot_paper_figures(
         ax.grid(ls='--')
     elif figure_path.stem == 'spectral_radius_ol':
         fig, ax = plt.subplots()
-        alpha = spectral_radii['alpha']
-        sr = spectral_radii['spectral_radius']
+        alpha = spect_rad['alpha']
+        spect_rad = spect_rad['spectral_radius']
         ax.semilogx(
             alpha,
-            sr['ol_from_ol'],
+            spect_rad['ol_from_ol'],
             color=OKABE_ITO['sky blue'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
-            sr['ol_from_cl'],
+            spect_rad['ol_from_cl'],
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
@@ -1129,8 +1129,8 @@ def action_plot_paper_figures(
         ax.grid(ls='--')
     elif figure_path.stem == 'cross_validation_cl':
         fig, ax = plt.subplots()
-        alpha = cross_validation['alpha']
-        r2 = cross_validation['r2_mean']
+        alpha = cv['alpha']
+        r2 = cv['r2_mean']
         ax.semilogx(
             alpha,
             r2['cl_from_ol'],
@@ -1149,8 +1149,8 @@ def action_plot_paper_figures(
         ax.grid(ls='--')
     elif figure_path.stem == 'cross_validation_ol':
         fig, ax = plt.subplots()
-        alpha = cross_validation['alpha']
-        r2 = cross_validation['r2_mean']
+        alpha = cv['alpha']
+        r2 = cv['r2_mean']
         ax.semilogx(
             alpha,
             r2['ol_from_ol'],
@@ -1168,9 +1168,83 @@ def action_plot_paper_figures(
         ax.legend(loc='upper right')
         ax.grid(ls='--')
     elif figure_path.stem == 'eigenvalues_cl':
-        fig, ax = plt.subplots()
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
+        ax.plot(
+            theta,
+            np.ones(theta.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        ev = {
+            'cl_score_cl_reg':
+            _eigvals(pred['kp']['cl_score_cl_reg']['cl_from_cl']),
+            'cl_score_ol_reg':
+            _eigvals(pred['kp']['cl_score_ol_reg']['cl_from_ol']),
+            'ol_score_cl_reg':
+            _eigvals(pred['kp']['ol_score_cl_reg']['cl_from_cl']),
+            'ol_score_ol_reg':
+            _eigvals(pred['kp']['ol_score_ol_reg']['cl_from_ol']),
+        }
+        ax.scatter(
+            np.angle(ev['cl_score_cl_reg']),
+            np.abs(ev['cl_score_cl_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['cl_score_ol_reg']),
+            np.abs(ev['cl_score_ol_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['ol_score_cl_reg']),
+            np.abs(ev['ol_score_cl_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['ol_score_ol_reg']),
+            np.abs(ev['ol_score_ol_reg']),
+        )
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'eigenvalues_ol':
-        fig, ax = plt.subplots()
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
+        ax.plot(
+            theta,
+            np.ones(theta.shape),
+            linewidth=1.5,
+            linestyle='--',
+            color=OKABE_ITO['black'],
+        )
+        ev = {
+            'cl_score_cl_reg':
+            _eigvals(pred['kp']['cl_score_cl_reg']['ol_from_cl']),
+            'cl_score_ol_reg':
+            _eigvals(pred['kp']['cl_score_ol_reg']['ol_from_ol']),
+            'ol_score_cl_reg':
+            _eigvals(pred['kp']['ol_score_cl_reg']['ol_from_cl']),
+            'ol_score_ol_reg':
+            _eigvals(pred['kp']['ol_score_ol_reg']['ol_from_ol']),
+        }
+        ax.scatter(
+            np.angle(ev['cl_score_cl_reg']),
+            np.abs(ev['cl_score_cl_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['cl_score_ol_reg']),
+            np.abs(ev['cl_score_ol_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['ol_score_cl_reg']),
+            np.abs(ev['ol_score_cl_reg']),
+        )
+        ax.scatter(
+            np.angle(ev['ol_score_ol_reg']),
+            np.abs(ev['ol_score_ol_reg']),
+        )
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'predictions_cl':
         fig, ax = plt.subplots()
     elif figure_path.stem == 'predictions_ol':
@@ -1186,8 +1260,8 @@ def action_plot_paper_figures(
             linestyle='--',
             color=OKABE_ITO['black'],
         )
-        ev_const = controller_rewrap['eigvals']['lstsq']
-        ev_new_const = controller_rewrap['eigvals']['lstsq_rewrap']
+        ev_const = cont_rewrap['eigvals']['lstsq']
+        ev_new_const = cont_rewrap['eigvals']['lstsq_rewrap']
         ax.scatter(
             np.angle(ev_const),
             np.abs(ev_const),
@@ -1210,8 +1284,8 @@ def action_plot_paper_figures(
             linestyle='--',
             color=OKABE_ITO['black'],
         )
-        ev_const = controller_rewrap['eigvals']['const']
-        ev_new_const = controller_rewrap['eigvals']['const_rewrap']
+        ev_const = cont_rewrap['eigvals']['const']
+        ev_new_const = cont_rewrap['eigvals']['const_rewrap']
         ax.scatter(
             np.angle(ev_const),
             np.abs(ev_const),
@@ -1227,16 +1301,16 @@ def action_plot_paper_figures(
         ep = 0
         fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
-            experiment['closed_loop']['X_test'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            exp['closed_loop']['X_test'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         X_pred_lstsq = pykoop.split_episodes(
-            controller_rewrap['X_pred']['lstsq'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            cont_rewrap['X_pred']['lstsq'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         X_pred_lstsq_rewrap = pykoop.split_episodes(
-            controller_rewrap['X_pred']['lstsq_rewrap'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            cont_rewrap['X_pred']['lstsq_rewrap'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         for i in range(ax.shape[0]):
             ax[i].plot(X_test[:, i])
@@ -1248,16 +1322,16 @@ def action_plot_paper_figures(
         ep = 0
         fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
-            experiment['closed_loop']['X_test'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            exp['closed_loop']['X_test'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         X_pred_const = pykoop.split_episodes(
-            controller_rewrap['X_pred']['const'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            cont_rewrap['X_pred']['const'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         X_pred_const_rewrap = pykoop.split_episodes(
-            controller_rewrap['X_pred']['const'],
-            episode_feature=experiment['closed_loop']['episode_feature'],
+            cont_rewrap['X_pred']['const'],
+            episode_feature=exp['closed_loop']['episode_feature'],
         )[ep][1]
         for i in range(ax.shape[0]):
             ax[i].plot(X_test[:, i])
