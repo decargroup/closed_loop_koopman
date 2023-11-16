@@ -3,7 +3,7 @@
 import collections
 import pathlib
 import shutil
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import control
 import doit
@@ -300,6 +300,10 @@ def task_plot_paper_figures():
         WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'cross_validation_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'cross_validation_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'eigenvalues_cl.pdf'),
+        WD.joinpath('build', 'paper_figures', 'eigenvalues_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'predictions_cl.pdf'),
+        WD.joinpath('build', 'paper_figures', 'predictions_ol.pdf'),
         WD.joinpath(
             'build',
             'paper_figures',
@@ -1099,7 +1103,7 @@ def action_plot_paper_figures(
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
-        ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{f})|$')
+        ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{f})$')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
@@ -1119,7 +1123,7 @@ def action_plot_paper_figures(
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
-        ax.set_ylabel(r'$|\bar{\lambda}(\mathbf{A}^\mathrm{p})|$')
+        ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{p})$')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
@@ -1139,7 +1143,7 @@ def action_plot_paper_figures(
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
-        ax.set_ylabel(r'$R^2$ score')
+        ax.set_ylabel(r'Closed-loop $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
@@ -1159,10 +1163,18 @@ def action_plot_paper_figures(
             color=OKABE_ITO['orange'],
             label='CL EDMD',
         )
-        ax.set_ylabel(r'$R^2$ score')
+        ax.set_ylabel(r'Plant $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
         ax.grid(ls='--')
+    elif figure_path.stem == 'eigenvalues_cl':
+        fig, ax = plt.subplots()
+    elif figure_path.stem == 'eigenvalues_ol':
+        fig, ax = plt.subplots()
+    elif figure_path.stem == 'predictions_cl':
+        fig, ax = plt.subplots()
+    elif figure_path.stem == 'predictions_ol':
+        fig, ax = plt.subplots()
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
@@ -1185,6 +1197,8 @@ def action_plot_paper_figures(
             np.abs(ev_new_const),
             marker='.',
         )
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'controller_rewrap_eig_const':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
@@ -1207,9 +1221,11 @@ def action_plot_paper_figures(
             np.abs(ev_new_const),
             marker='.',
         )
+        ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
+        ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'controller_rewrap_pred_lstsq':
         ep = 0
-        fig, ax = plt.subplots(4, 1)
+        fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
             experiment['closed_loop']['X_test'],
             episode_feature=experiment['closed_loop']['episode_feature'],
@@ -1226,8 +1242,29 @@ def action_plot_paper_figures(
             ax[i].plot(X_test[:, i])
             ax[i].plot(X_pred_lstsq[:, i])
             ax[i].plot(X_pred_lstsq_rewrap[:, i])
+            _autoset_ylim(ax[i], [X_test[:, i], X_pred_lstsq[:, i]])
+            ax[i].grid(ls='--')
     elif figure_path.stem == 'controller_rewrap_pred_const':
-        fig, ax = plt.subplots(4, 1)
+        ep = 0
+        fig, ax = plt.subplots(4, 1, sharex=True)
+        X_test = pykoop.split_episodes(
+            experiment['closed_loop']['X_test'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        X_pred_const = pykoop.split_episodes(
+            controller_rewrap['X_pred']['const'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        X_pred_const_rewrap = pykoop.split_episodes(
+            controller_rewrap['X_pred']['const'],
+            episode_feature=experiment['closed_loop']['episode_feature'],
+        )[ep][1]
+        for i in range(ax.shape[0]):
+            ax[i].plot(X_test[:, i])
+            ax[i].plot(X_pred_const[:, i])
+            ax[i].plot(X_pred_const_rewrap[:, i])
+            _autoset_ylim(ax[i], [X_test[:, i], X_pred_const[:, i]])
+            ax[i].grid(ls='--')
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
@@ -1270,3 +1307,32 @@ def _spectral_radius(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
     eigs = _eigvals(koopman_pipeline)
     max_eig = np.max(np.abs(eigs))
     return max_eig
+
+
+def _autoset_ylim(
+    ax: plt.Axes,
+    X: List[np.ndarray],
+    symmetric: bool = False,
+    scale: float = 1.25,
+):
+    """Automatically set y-axis limit based on data.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Axis of which to set limits.
+    X : List[np.ndarray]
+        List of data used to set axis limits.
+    symmetric : bool
+        True if axis limits should be symmetric.
+    scale : float
+        Limit scaling factor.
+    """
+    Xc = np.concatenate(X)
+    if symmetric:
+        max = np.max(np.abs(Xc)) * scale
+        min = -1 * max
+    else:
+        max = np.max(Xc) * scale
+        min = np.min(Xc) * scale
+    ax.set_ylim([min, max])
