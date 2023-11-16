@@ -143,9 +143,6 @@ def main():
     ax.set_xlabel('alpha')
     ax.legend(loc='upper right')
 
-    plt.show()
-    exit()
-
     fig, ax = plt.subplots()
     ax.semilogx(alpha, mse_mean['cl_from_ol'], label='EDMD')
     ax.semilogx(alpha, mse_mean['cl_from_cl'], label='CL Koop.')
