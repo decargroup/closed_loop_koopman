@@ -1247,8 +1247,139 @@ def action_plot_paper_figures(
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'predictions_cl':
         fig, ax = plt.subplots()
+        ep = 0
+        X_test = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['X_test'].items()
+        }
+        Xp_cl_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
+        }
+        Xp_cl_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
+        }
+        Xp_ol_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
+        }
+        Xp_ol_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        fig, ax = plt.subplots(4, 1)
+        for i, a in enumerate(ax.ravel()):
+            a.plot(
+                X_test['cl_from_cl'][:, i],
+                label='true',
+            )
+            a.plot(
+                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                label='cl_score_cl_reg',
+            )
+            a.plot(
+                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
+                label='cl_score_ol_reg',
+            )
+            a.plot(
+                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+                label='ol_score_cl_reg',
+            )
+            a.plot(
+                Xp_ol_score_ol_reg['cl_from_ol'][:, i],
+                label='ol_score_ol_reg',
+            )
+            _autoset_ylim(a, [
+                X_test['cl_from_cl'][:, i],
+                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
+                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+            ])
+        ax[0].legend()
     elif figure_path.stem == 'predictions_ol':
         fig, ax = plt.subplots()
+        ep = 0
+        X_test = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['X_test'].items()
+        }
+        Xp_cl_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
+        }
+        Xp_cl_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
+        }
+        Xp_ol_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
+        }
+        Xp_ol_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        fig, ax = plt.subplots(2, 1)
+        for i, a in enumerate(ax.ravel()):
+            a.plot(
+                X_test['ol_from_ol'][:, i],
+                label='true',
+            )
+            a.plot(
+                Xp_cl_score_cl_reg['ol_from_cl'][:, i],
+                label='cl_score_cl_reg',
+            )
+            a.plot(
+                Xp_cl_score_ol_reg['ol_from_ol'][:, i],
+                label='cl_score_ol_reg',
+            )
+            a.plot(
+                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                label='ol_score_cl_reg',
+            )
+            a.plot(
+                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+                label='ol_score_ol_reg',
+            )
+            _autoset_ylim(a, [
+                X_test['ol_from_ol'][:, i],
+                # Xp_cl_score_cl_reg['ol_from_cl'][:, i],
+                # Xp_cl_score_ol_reg['ol_from_ol'][:, i],
+                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+            ])
+        ax[0].legend()
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
