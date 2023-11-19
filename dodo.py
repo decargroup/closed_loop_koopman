@@ -270,11 +270,6 @@ def task_plot_paper_figures():
         'experiments',
         'training_controller.pickle',
     )
-    lifting_functions = WD.joinpath(
-        'build',
-        'lifting_functions',
-        'lifting_functions.pickle',
-    )
     cross_validation = WD.joinpath(
         'build',
         'cross_validation',
@@ -304,6 +299,7 @@ def task_plot_paper_figures():
         WD.joinpath('build', 'paper_figures', 'eigenvalues_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'inputs_cl.pdf'),
         WD.joinpath(
             'build',
             'paper_figures',
@@ -331,7 +327,6 @@ def task_plot_paper_figures():
             figure.stem,
             'actions': [(action_plot_paper_figures, (
                 experiment,
-                lifting_functions,
                 cross_validation,
                 predictions,
                 spectral_radii,
@@ -340,7 +335,6 @@ def task_plot_paper_figures():
             ))],
             'file_dep': [
                 experiment,
-                lifting_functions,
                 cross_validation,
                 predictions,
                 spectral_radii,
@@ -1077,7 +1071,6 @@ def action_rewrap_controller(
 
 def action_plot_paper_figures(
     experiment_path: pathlib.Path,
-    lifting_functions_path: pathlib.Path,
     cross_validation_path: pathlib.Path,
     predictions_path: pathlib.Path,
     spectral_radii_path: pathlib.Path,
@@ -1087,7 +1080,6 @@ def action_plot_paper_figures(
     """Plot paper figures."""
     # Load data
     exp = joblib.load(experiment_path)
-    lf = joblib.load(lifting_functions_path)
     cv = joblib.load(cross_validation_path)
     pred = joblib.load(predictions_path)
     spect_rad = joblib.load(spectral_radii_path)
@@ -1254,7 +1246,6 @@ def action_plot_paper_figures(
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'predictions_cl':
-        fig, ax = plt.subplots()
         ep = 0
         X_test = {
             key: pykoop.split_episodes(
@@ -1321,7 +1312,6 @@ def action_plot_paper_figures(
             ])
         ax[0].legend()
     elif figure_path.stem == 'predictions_ol':
-        fig, ax = plt.subplots()
         ep = 0
         X_test = {
             key: pykoop.split_episodes(
@@ -1386,6 +1376,19 @@ def action_plot_paper_figures(
                 Xp_ol_score_ol_reg['ol_from_ol'][:, i],
             ])
         ax[0].legend()
+    elif figure_path.stem == 'inputs_cl':
+        fig, ax = plt.subplots(3, 1)
+        ep = 0
+        X_test = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[ep][1]
+            for (key, value) in pred['X_test'].items()
+        }
+        ax[0].plot(X_test['cl_from_cl'][:, 4])
+        ax[1].plot(X_test['cl_from_cl'][:, 5])
+        ax[2].plot(X_test['cl_from_cl'][:, 6])
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
