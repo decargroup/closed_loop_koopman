@@ -868,6 +868,7 @@ def action_score_prediction(
     # Score all the scenarios
     r2: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     mse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
+    nrmse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     for x_score_y_reg in pred['Xp'].keys():
         for x_from_y in pred['Xp'][x_score_y_reg].keys():
             eps_test = pykoop.split_episodes(
@@ -880,6 +881,7 @@ def action_score_prediction(
             )
             r2_list = []
             mse_list = []
+            nrmse_list = []
             for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
                 r2_list.append(
                     pykoop.score_trajectory(
@@ -894,12 +896,18 @@ def action_score_prediction(
                     regression_metric='neg_mean_squared_error',
                     episode_feature=False,
                 ))
+                e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
+                rmse = np.sqrt(np.mean(e_i**2, axis=0))
+                ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
+                nrmse_list.append(rmse / ampl)
             r2[x_score_y_reg][x_from_y] = np.array(r2_list)
             mse[x_score_y_reg][x_from_y] = np.array(mse_list)
+            nrmse[x_score_y_reg][x_from_y] = np.array(nrmse_list)
     # Save scores
     scores = {
         'r2': r2,
         'mse': mse,
+        'nrmse': nrmse,
     }
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(scores, scores_path)
@@ -1374,8 +1382,6 @@ def action_plot_paper_figures(
             )
             _autoset_ylim(a, [
                 X_test['ol_from_ol'][:, i],
-                # Xp_cl_score_cl_reg['ol_from_cl'][:, i],
-                # Xp_cl_score_ol_reg['ol_from_ol'][:, i],
                 Xp_ol_score_cl_reg['ol_from_cl'][:, i],
                 Xp_ol_score_ol_reg['ol_from_ol'][:, i],
             ])
