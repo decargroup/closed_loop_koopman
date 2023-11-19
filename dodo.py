@@ -186,20 +186,27 @@ def task_score_prediction():
         'predictions',
         'predictions.pickle',
     )
-    scores = WD.joinpath(
+    scores_pickle = WD.joinpath(
         'build',
         'scores',
         'scores.pickle',
+    )
+    scores_csv = WD.joinpath(
+        'build',
+        'scores',
+        'scores.csv',
     )
     return {
         'actions': [(action_score_prediction, (
             experiment,
             predictions,
-            scores,
+            scores_pickle,
+            scores_csv,
         ))],
         'file_dep': [experiment, predictions],
-        'targets': [scores],
-        'clean': True,
+        'targets': [scores_pickle, scores_csv],
+        'clean':
+        True,
     }
 
 
@@ -851,6 +858,7 @@ def action_score_prediction(
     experiment_path: pathlib.Path,
     predictions_path: pathlib.Path,
     scores_path: pathlib.Path,
+    scores_csv_path: pathlib.Path,
 ):
     """Score prediction for all test episodes."""
     exp = joblib.load(experiment_path)
@@ -893,7 +901,7 @@ def action_score_prediction(
                 e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
                 rmse = np.sqrt(np.mean(e_i**2, axis=0))
                 ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
-                nrmse_list.append(rmse / ampl)
+                nrmse_list.append(np.mean(rmse / ampl * 100))
             r2[x_score_y_reg][x_from_y] = np.array(r2_list)
             mse[x_score_y_reg][x_from_y] = np.array(mse_list)
             nrmse[x_score_y_reg][x_from_y] = np.array(nrmse_list)
@@ -901,10 +909,45 @@ def action_score_prediction(
     scores = {
         'r2': r2,
         'mse': mse,
-        'nrmse': nrmse,
+        '%nrmse': nrmse,
     }
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(scores, scores_path)
+    # Format score array for CSV
+    csv_scores = np.block([
+        [
+            np.mean(scores['r2']['ol_score_ol_reg']['cl_from_ol']),
+            np.std(scores['r2']['ol_score_ol_reg']['cl_from_ol']),
+            np.mean(scores['%nrmse']['ol_score_ol_reg']['cl_from_ol']),
+            np.std(scores['%nrmse']['ol_score_ol_reg']['cl_from_ol']),
+        ],
+        [
+            np.mean(scores['r2']['ol_score_cl_reg']['cl_from_cl']),
+            np.std(scores['r2']['ol_score_cl_reg']['cl_from_cl']),
+            np.mean(scores['%nrmse']['ol_score_cl_reg']['cl_from_cl']),
+            np.std(scores['%nrmse']['ol_score_cl_reg']['cl_from_cl']),
+        ],
+        [
+            np.mean(scores['r2']['cl_score_ol_reg']['cl_from_ol']),
+            np.std(scores['r2']['cl_score_ol_reg']['cl_from_ol']),
+            np.mean(scores['%nrmse']['cl_score_ol_reg']['cl_from_ol']),
+            np.std(scores['%nrmse']['cl_score_ol_reg']['cl_from_ol']),
+        ],
+        [
+            np.mean(scores['r2']['cl_score_cl_reg']['cl_from_cl']),
+            np.std(scores['r2']['cl_score_cl_reg']['cl_from_cl']),
+            np.mean(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
+            np.std(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
+        ],
+    ])
+    np.savetxt(
+        scores_csv_path,
+        csv_scores,
+        fmt='%.3f',
+        delimiter=',',
+        header='mean R2, std R2, mean %NRMSE, std %NRMSE',
+        comments='',
+    )
 
 
 def action_run_regularizer_sweep(
