@@ -1207,45 +1207,53 @@ def action_plot_paper_figures(
         ax.legend(loc='upper right')
         ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'cross_validation_cl':
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         alpha = cv['alpha']
         r2 = cv['r2_mean']
         ax.semilogx(
             alpha,
             r2['cl_from_ol'],
-            color=OKABE_ITO['sky blue'],
+            color=c['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             r2['cl_from_cl'],
-            color=OKABE_ITO['orange'],
+            color=c['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'Closed-loop $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
-        ax.legend(loc='upper right')
-        ax.grid(ls='--')
+        ax.legend(loc='lower left')
+        ax.set_ylim([-2, 1])
+        ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'cross_validation_ol':
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         alpha = cv['alpha']
         r2 = cv['r2_mean']
         ax.semilogx(
             alpha,
             r2['ol_from_ol'],
-            color=OKABE_ITO['sky blue'],
+            color=c['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             r2['ol_from_cl'],
-            color=OKABE_ITO['orange'],
+            color=c['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'Plant $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
-        ax.legend(loc='upper right')
-        ax.grid(ls='--')
+        ax.legend(loc='lower left')
+        ax.set_ylim([-2, 1])
+        ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'eigenvalues_cl':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
