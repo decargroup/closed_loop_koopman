@@ -1139,50 +1139,73 @@ def action_plot_paper_figures(
     # Set colors
     c = {
         'ref': OKABE_ITO['black'],
+        'boundary': OKABE_ITO['black'],
+        'cl_score_cl_reg': OKABE_ITO['blue'],
+        'cl_score_ol_reg': OKABE_ITO['vermillion'],
+        'ol_score_cl_reg': OKABE_ITO['sky blue'],
+        'ol_score_ol_reg': OKABE_ITO['orange'],
     }
     # Set test episode to plot
     test_ep = 0
     # Plot figure
     if figure_path.stem == 'spectral_radius_cl':
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         alpha = spect_rad['alpha']
         spect_rad = spect_rad['spectral_radius']
         ax.semilogx(
             alpha,
+            np.ones_like(alpha),
+            linestyle='--',
+            color=c['boundary'],
+        )
+        ax.semilogx(
+            alpha,
             spect_rad['cl_from_ol'],
-            color=OKABE_ITO['sky blue'],
+            color=c['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             spect_rad['cl_from_cl'],
-            color=OKABE_ITO['orange'],
+            color=c['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{f})$')
         ax.set_xlabel(r'$\alpha$')
-        ax.legend(loc='upper right')
-        ax.grid(ls='--')
+        ax.legend(loc='upper left')
+        ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'spectral_radius_ol':
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         alpha = spect_rad['alpha']
         spect_rad = spect_rad['spectral_radius']
         ax.semilogx(
             alpha,
+            np.ones_like(alpha),
+            linestyle='--',
+            color=c['boundary'],
+        )
+        ax.semilogx(
+            alpha,
             spect_rad['ol_from_ol'],
-            color=OKABE_ITO['sky blue'],
+            color=c['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             spect_rad['ol_from_cl'],
-            color=OKABE_ITO['orange'],
+            color=c['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{p})$')
         ax.set_xlabel(r'$\alpha$')
         ax.legend(loc='upper right')
-        ax.grid(ls='--')
+        ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'cross_validation_cl':
         fig, ax = plt.subplots()
         alpha = cv['alpha']
