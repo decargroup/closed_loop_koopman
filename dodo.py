@@ -1255,16 +1255,13 @@ def action_plot_paper_figures(
         ax.set_ylim([-2, 1])
         ax.set_xticks([1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
     elif figure_path.stem == 'eigenvalues_cl':
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
-        theta = np.linspace(0, 2 * np.pi)
-        ax.plot(
-            theta,
-            np.ones(theta.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
+        fig = plt.figure(
+            constrained_layout=True,
+            figsize=(LW, LW),
         )
+        ax = fig.add_subplot(projection='polar')
+        axins = fig.add_axes([0.4, 0.05, 0.5, 0.5], projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
             _eigvals(pred['kp']['cl_score_cl_reg']['cl_from_cl']),
@@ -1275,35 +1272,122 @@ def action_plot_paper_figures(
             'ol_score_ol_reg':
             _eigvals(pred['kp']['ol_score_ol_reg']['cl_from_ol']),
         }
-        ax.scatter(
-            np.angle(ev['cl_score_cl_reg']),
-            np.abs(ev['cl_score_cl_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['cl_score_ol_reg']),
-            np.abs(ev['cl_score_ol_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['ol_score_cl_reg']),
-            np.abs(ev['ol_score_cl_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['ol_score_ol_reg']),
-            np.abs(ev['ol_score_ol_reg']),
-        )
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        for a in [ax, axins]:
+            a.plot(
+                theta,
+                np.ones(theta.shape),
+                linestyle='--',
+                color=c['boundary'],
+            )
+            a.scatter(
+                np.angle(ev['cl_score_ol_reg']),
+                np.abs(ev['cl_score_ol_reg']),
+                color=c['cl_score_ol_reg'],
+                marker='s',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['cl_score_cl_reg']),
+                np.abs(ev['cl_score_cl_reg']),
+                color=c['cl_score_cl_reg'],
+                marker='o',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['ol_score_ol_reg']),
+                np.abs(ev['ol_score_ol_reg']),
+                color=c['ol_score_ol_reg'],
+                marker='D',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['ol_score_cl_reg']),
+                np.abs(ev['ol_score_cl_reg']),
+                color=c['ol_score_cl_reg'],
+                marker='v',
+                **style,
+            )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
-    elif figure_path.stem == 'eigenvalues_ol':
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
-        theta = np.linspace(0, 2 * np.pi)
+        # Set limits for zoomed plot
+        rmin = 0.85
+        rmax = 1.05
+        thmax = np.pi / 16
+        axins.set_rlim(rmin, rmax)
+        axins.set_thetalim(-thmax, thmax)
+        # Border line width and color
+        border_lw = 1
+        border_color = 'k'
+        # Plot border of zoomed area
+        thb = np.linspace(-thmax, thmax, 1000)
         ax.plot(
-            theta,
-            np.ones(theta.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
+            thb,
+            rmin * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
         )
+        ax.plot(
+            thb,
+            rmax * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        rb = np.linspace(rmin, rmax, 1000)
+        ax.plot(
+            thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            -thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        # Create lines linking border to zoomed plot
+        axins.annotate(
+            '',
+            xy=(thmax, rmax),
+            xycoords=ax.transData,
+            xytext=(thmax, rmax),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+        axins.annotate(
+            '',
+            xy=(thmax, rmin),
+            xycoords=ax.transData,
+            xytext=(thmax, rmin),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+    elif figure_path.stem == 'eigenvalues_ol':
+        fig = plt.figure(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        ax = fig.add_subplot(projection='polar')
+        axins = fig.add_axes([0.4, 0.05, 0.5, 0.5], projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
             _eigvals(pred['kp']['cl_score_cl_reg']['ol_from_cl']),
@@ -1314,24 +1398,114 @@ def action_plot_paper_figures(
             'ol_score_ol_reg':
             _eigvals(pred['kp']['ol_score_ol_reg']['ol_from_ol']),
         }
-        ax.scatter(
-            np.angle(ev['cl_score_cl_reg']),
-            np.abs(ev['cl_score_cl_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['cl_score_ol_reg']),
-            np.abs(ev['cl_score_ol_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['ol_score_cl_reg']),
-            np.abs(ev['ol_score_cl_reg']),
-        )
-        ax.scatter(
-            np.angle(ev['ol_score_ol_reg']),
-            np.abs(ev['ol_score_ol_reg']),
-        )
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        for a in [ax, axins]:
+            a.plot(
+                theta,
+                np.ones(theta.shape),
+                linestyle='--',
+                color=c['boundary'],
+            )
+            a.scatter(
+                np.angle(ev['cl_score_ol_reg']),
+                np.abs(ev['cl_score_ol_reg']),
+                color=c['cl_score_ol_reg'],
+                marker='s',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['cl_score_cl_reg']),
+                np.abs(ev['cl_score_cl_reg']),
+                color=c['cl_score_cl_reg'],
+                marker='o',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['ol_score_ol_reg']),
+                np.abs(ev['ol_score_ol_reg']),
+                color=c['ol_score_ol_reg'],
+                marker='D',
+                **style,
+            )
+            a.scatter(
+                np.angle(ev['ol_score_cl_reg']),
+                np.abs(ev['ol_score_cl_reg']),
+                color=c['ol_score_cl_reg'],
+                marker='v',
+                **style,
+            )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        # Set limits for zoomed plot
+        rmin = 0.90
+        rmax = 1.05
+        thmax = np.pi / 16
+        axins.set_rlim(rmin, rmax)
+        axins.set_thetalim(-thmax, thmax)
+        # Border line width and color
+        border_lw = 1
+        border_color = 'k'
+        # Plot border of zoomed area
+        thb = np.linspace(-thmax, thmax, 1000)
+        ax.plot(
+            thb,
+            rmin * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            thb,
+            rmax * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        rb = np.linspace(rmin, rmax, 1000)
+        ax.plot(
+            thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            -thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        # Create lines linking border to zoomed plot
+        axins.annotate(
+            '',
+            xy=(-thmax, rmax),
+            xycoords=ax.transData,
+            xytext=(thmax, rmax),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+        axins.annotate(
+            '',
+            xy=(thmax, rmin),
+            xycoords=ax.transData,
+            xytext=(thmax, rmin),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
     elif figure_path.stem == 'predictions_cl':
         X_test = {
             key: pykoop.split_episodes(
