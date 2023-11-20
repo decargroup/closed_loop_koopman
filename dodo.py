@@ -39,6 +39,13 @@ OKABE_ITO = {
     'grey': (0.60, 0.60, 0.60),
 }
 
+# LaTeX linewidth (inches)
+LW = 3.5
+
+# Set gobal Matplotlib options
+plt.rc('lines', linewidth=2)
+plt.rc('axes', grid=True)
+plt.rc('grid', linestyle='--')
 # Set LaTeX rendering only if available
 usetex = True if shutil.which('latex') else False
 if usetex:
@@ -1129,6 +1136,12 @@ def action_plot_paper_figures(
     cont_rewrap = joblib.load(controller_rewrap_path)
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
+    # Set colors
+    c = {
+        'ref': OKABE_ITO['black'],
+    }
+    # Set test episode to plot
+    test_ep = 0
     # Plot figure
     if figure_path.stem == 'spectral_radius_cl':
         fig, ax = plt.subplots()
@@ -1289,40 +1302,39 @@ def action_plot_paper_figures(
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'predictions_cl':
-        ep = 0
         X_test = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
         fig, ax = plt.subplots(4, 1)
@@ -1355,40 +1367,39 @@ def action_plot_paper_figures(
             ])
         ax[0].legend()
     elif figure_path.stem == 'predictions_ol':
-        ep = 0
         X_test = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
         fig, ax = plt.subplots(2, 1)
@@ -1420,18 +1431,31 @@ def action_plot_paper_figures(
             ])
         ax[0].legend()
     elif figure_path.stem == 'inputs_cl':
-        fig, ax = plt.subplots(3, 1)
-        ep = 0
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         X_test = {
             key: pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
-            )[ep][1]
+            )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
-        ax[0].plot(X_test['cl_from_cl'][:, 4])
-        ax[1].plot(X_test['cl_from_cl'][:, 5])
-        ax[2].plot(X_test['cl_from_cl'][:, 6])
+        t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
+        ax[0].plot(t, X_test['cl_from_cl'][:, 4], color=c['ref'])
+        ax[1].plot(t, X_test['cl_from_cl'][:, 5], color=c['ref'])
+        ax[2].plot(t, X_test['cl_from_cl'][:, 6], color=c['ref'])
+        ax[0].set_ylabel(r'$r_1(t)$ (rad)')
+        ax[1].set_ylabel(r'$r_2(t)$ (rad)')
+        ax[2].set_ylabel(r'$f(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        ax[2].set_xlim([2, 16])
+        ax[2].set_xticks([3, 6, 9, 12, 15])
+        fig.align_ylabels()
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
         fig = plt.figure()
         ax = fig.add_subplot(projection='polar')
@@ -1481,20 +1505,19 @@ def action_plot_paper_figures(
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
     elif figure_path.stem == 'controller_rewrap_pred_lstsq':
-        ep = 0
         fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         X_pred_lstsq = pykoop.split_episodes(
             cont_rewrap['X_pred']['lstsq'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         X_pred_lstsq_rewrap = pykoop.split_episodes(
             cont_rewrap['X_pred']['lstsq_rewrap'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         for i in range(ax.shape[0]):
             ax[i].plot(X_test[:, i])
             ax[i].plot(X_pred_lstsq[:, i])
@@ -1502,20 +1525,19 @@ def action_plot_paper_figures(
             _autoset_ylim(ax[i], [X_test[:, i], X_pred_lstsq[:, i]])
             ax[i].grid(ls='--')
     elif figure_path.stem == 'controller_rewrap_pred_const':
-        ep = 0
         fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         X_pred_const = pykoop.split_episodes(
             cont_rewrap['X_pred']['const'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         X_pred_const_rewrap = pykoop.split_episodes(
             cont_rewrap['X_pred']['const'],
             episode_feature=exp['closed_loop']['episode_feature'],
-        )[ep][1]
+        )[test_ep][1]
         for i in range(ax.shape[0]):
             ax[i].plot(X_test[:, i])
             ax[i].plot(X_pred_const[:, i])
