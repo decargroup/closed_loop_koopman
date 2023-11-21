@@ -1146,10 +1146,10 @@ def action_plot_paper_figures(
         'cl_score_ol_reg': OKABE_ITO['vermillion'],
         'ol_score_cl_reg': OKABE_ITO['sky blue'],
         'ol_score_ol_reg': OKABE_ITO['orange'],
-        'ev_const': OKABE_ITO['blue'],
-        'ev_new_const': OKABE_ITO['vermillion'],
-        'ev_lstsq': OKABE_ITO['blue'],
-        'ev_new_lstsq': OKABE_ITO['vermillion'],
+        'const': OKABE_ITO['blue'],
+        'new_const': OKABE_ITO['vermillion'],
+        'lstsq': OKABE_ITO['blue'],
+        'new_lstsq': OKABE_ITO['vermillion'],
     }
     labels = {
         'ref': 'Measured',
@@ -1159,10 +1159,10 @@ def action_plot_paper_figures(
         'cl_score_ol_reg': r'EDMD, $\alpha^\mathrm{f}$',
         'ol_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{p}$',
         'ol_score_ol_reg': r'EDMD, $\alpha^\mathrm{p}$',
-        'ev_const': 'Identified',
-        'ev_new_const': 'Reconstructed',
-        'ev_lstsq': 'Identified',
-        'ev_new_lstsq': 'Reconstructed',
+        'const': 'Identified',
+        'new_const': 'Reconstructed',
+        'lstsq': 'Identified',
+        'new_lstsq': 'Reconstructed',
     }
     # Set test episode to plot
     test_ep = 0
@@ -1644,8 +1644,8 @@ def action_plot_paper_figures(
         ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
         ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
         ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
-        ax[3].set_ylim([-0.35, 0.35])
         fig.align_ylabels()
+        ax[3].set_ylim([-0.35, 0.35])
         ax[3].set_yticks([-0.3, 0, 0.3])
         ax[3].set_xlabel(r'$t$ (s)')
         fig.legend(
@@ -1818,16 +1818,16 @@ def action_plot_paper_figures(
                 np.angle(ev_lstsq),
                 np.abs(ev_lstsq),
                 marker='o',
-                color=colors['ev_lstsq'],
-                label=labels['ev_lstsq'],
+                color=colors['lstsq'],
+                label=labels['lstsq'],
                 **style,
             )
             a.scatter(
                 np.angle(ev_new_lstsq),
                 np.abs(ev_new_lstsq),
                 marker='.',
-                color=colors['ev_new_lstsq'],
-                label=labels['ev_new_lstsq'],
+                color=colors['new_lstsq'],
+                label=labels['new_lstsq'],
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
@@ -1934,16 +1934,16 @@ def action_plot_paper_figures(
                 np.angle(ev_const),
                 np.abs(ev_const),
                 marker='o',
-                color=colors['ev_const'],
-                label=labels['ev_const'],
+                color=colors['const'],
+                label=labels['const'],
                 **style,
             )
             a.scatter(
                 np.angle(ev_new_const),
                 np.abs(ev_new_const),
                 marker='.',
-                color=colors['ev_new_const'],
-                label=labels['ev_new_const'],
+                color=colors['new_const'],
+                label=labels['new_const'],
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
@@ -2024,7 +2024,13 @@ def action_plot_paper_figures(
             },
         )
     elif figure_path.stem == 'controller_rewrap_pred_lstsq':
-        fig, ax = plt.subplots(4, 1, sharex=True)
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW * 1.4),
+        )
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
             episode_feature=exp['closed_loop']['episode_feature'],
@@ -2037,14 +2043,54 @@ def action_plot_paper_figures(
             cont_rewrap['X_pred']['lstsq_rewrap'],
             episode_feature=exp['closed_loop']['episode_feature'],
         )[test_ep][1]
+        t = np.arange(X_pred_lstsq.shape[0]) * exp['t_step']
         for i in range(ax.shape[0]):
-            ax[i].plot(X_test[:, i])
-            ax[i].plot(X_pred_lstsq[:, i])
-            ax[i].plot(X_pred_lstsq_rewrap[:, i])
+            ax[i].plot(
+                t,
+                X_test[:, i],
+                color=colors['ref'],
+                label=labels['ref'],
+            )
+            ax[i].plot(
+                t,
+                X_pred_lstsq[:, i],
+                color=colors['lstsq'],
+                label=labels['lstsq'],
+            )
+            ax[i].plot(
+                t,
+                X_pred_lstsq_rewrap[:, i],
+                color=colors['new_lstsq'],
+                label=labels['new_lstsq'],
+            )
             _autoset_ylim(ax[i], [X_test[:, i], X_pred_lstsq[:, i]])
-            ax[i].grid(ls='--')
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
+        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        ax[3].set_ylim([-0.35, 0.35])
+        ax[3].set_yticks([-0.3, 0, 0.3])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, -0.13),
+        )
     elif figure_path.stem == 'controller_rewrap_pred_const':
-        fig, ax = plt.subplots(4, 1, sharex=True)
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW * 1.4),
+        )
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
             episode_feature=exp['closed_loop']['episode_feature'],
@@ -2057,12 +2103,46 @@ def action_plot_paper_figures(
             cont_rewrap['X_pred']['const'],
             episode_feature=exp['closed_loop']['episode_feature'],
         )[test_ep][1]
+        t = np.arange(X_pred_const.shape[0]) * exp['t_step']
         for i in range(ax.shape[0]):
-            ax[i].plot(X_test[:, i])
-            ax[i].plot(X_pred_const[:, i])
-            ax[i].plot(X_pred_const_rewrap[:, i])
+            ax[i].plot(
+                t,
+                X_test[:, i],
+                color=colors['ref'],
+                label=labels['ref'],
+            )
+            ax[i].plot(
+                t,
+                X_pred_const[:, i],
+                color=colors['const'],
+                label=labels['const'],
+            )
+            ax[i].plot(
+                t,
+                X_pred_const_rewrap[:, i],
+                color=colors['new_const'],
+                label=labels['new_const'],
+            )
             _autoset_ylim(ax[i], [X_test[:, i], X_pred_const[:, i]])
-            ax[i].grid(ls='--')
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
+        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        ax[3].set_ylim([-0.35, 0.35])
+        ax[3].set_yticks([-0.3, 0, 0.3])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, -0.13),
+        )
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
