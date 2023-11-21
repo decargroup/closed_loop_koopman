@@ -1146,6 +1146,10 @@ def action_plot_paper_figures(
         'cl_score_ol_reg': OKABE_ITO['vermillion'],
         'ol_score_cl_reg': OKABE_ITO['sky blue'],
         'ol_score_ol_reg': OKABE_ITO['orange'],
+        'ev_const': OKABE_ITO['blue'],
+        'ev_new_const': OKABE_ITO['vermillion'],
+        'ev_lstsq': OKABE_ITO['blue'],
+        'ev_new_lstsq': OKABE_ITO['vermillion'],
     }
     labels = {
         'ref': 'Measured',
@@ -1155,6 +1159,10 @@ def action_plot_paper_figures(
         'cl_score_ol_reg': r'EDMD, $\alpha^\mathrm{f}$',
         'ol_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{p}$',
         'ol_score_ol_reg': r'EDMD, $\alpha^\mathrm{p}$',
+        'ev_const': 'Identified',
+        'ev_new_const': 'Reconstructed',
+        'ev_lstsq': 'Identified',
+        'ev_new_lstsq': 'Reconstructed',
     }
     # Set test episode to plot
     test_ep = 0
@@ -1782,57 +1790,239 @@ def action_plot_paper_figures(
         ax[1].set_ylabel(r'$r_2(t)$ (rad)')
         ax[2].set_ylabel(r'$f(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
-        # ax[2].set_xlim([2, 16])
-        # ax[2].set_xticks([3, 6, 9, 12, 15])
         fig.align_ylabels()
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
-        fig = plt.figure()
+        fig = plt.figure(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
         ax = fig.add_subplot(projection='polar')
+        axins = fig.add_axes([0.44, 0.06, 0.5, 0.5], projection='polar')
         theta = np.linspace(0, 2 * np.pi)
-        ax.plot(
-            theta,
-            np.ones(theta.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
-        )
-        ev_const = cont_rewrap['eigvals']['lstsq']
-        ev_new_const = cont_rewrap['eigvals']['lstsq_rewrap']
-        ax.scatter(
-            np.angle(ev_const),
-            np.abs(ev_const),
-        )
-        ax.scatter(
-            np.angle(ev_new_const),
-            np.abs(ev_new_const),
-            marker='.',
-        )
+        ev_lstsq = cont_rewrap['eigvals']['lstsq']
+        ev_new_lstsq = cont_rewrap['eigvals']['lstsq_rewrap']
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        for a in [ax, axins]:
+            a.plot(
+                theta,
+                np.ones(theta.shape),
+                linestyle='--',
+                color=colors['boundary'],
+            )
+            a.scatter(
+                np.angle(ev_lstsq),
+                np.abs(ev_lstsq),
+                marker='o',
+                color=colors['ev_lstsq'],
+                label=labels['ev_lstsq'],
+                **style,
+            )
+            a.scatter(
+                np.angle(ev_new_lstsq),
+                np.abs(ev_new_lstsq),
+                marker='.',
+                color=colors['ev_new_lstsq'],
+                label=labels['ev_new_lstsq'],
+                **style,
+            )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
-    elif figure_path.stem == 'controller_rewrap_eig_const':
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
-        theta = np.linspace(0, 2 * np.pi)
-        ax.plot(
-            theta,
-            np.ones(theta.shape),
-            linewidth=1.5,
-            linestyle='--',
-            color=OKABE_ITO['black'],
+        fig.legend(
+            handles=[
+                ax.get_children()[1],
+                ax.get_children()[2],
+            ],
+            loc='lower left',
+            ncol=1,
+            handlelength=1,
+            # bbox_to_anchor=(0.5, 0),
         )
+        # Set limits for zoomed plot
+        rmin = 0.70
+        rmax = 1.05
+        thmax = np.pi / 16
+        axins.set_rlim(rmin, rmax)
+        axins.set_thetalim(-thmax, thmax)
+        # Border line width and color
+        border_lw = 1
+        border_color = 'k'
+        # Plot border of zoomed area
+        thb = np.linspace(-thmax, thmax, 1000)
+        ax.plot(
+            thb,
+            rmin * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            thb,
+            rmax * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        rb = np.linspace(rmin, rmax, 1000)
+        ax.plot(
+            thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            -thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        # Create lines linking border to zoomed plot
+        axins.annotate(
+            '',
+            xy=(thmax, rmax),
+            xycoords=ax.transData,
+            xytext=(thmax, rmax),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+        axins.annotate(
+            '',
+            xy=(thmax, rmin),
+            xycoords=ax.transData,
+            xytext=(thmax, rmin),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+    elif figure_path.stem == 'controller_rewrap_eig_const':
+        fig = plt.figure(
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        ax = fig.add_subplot(projection='polar')
+        axins = fig.add_axes([0.44, 0.06, 0.5, 0.5], projection='polar')
+        theta = np.linspace(0, 2 * np.pi)
         ev_const = cont_rewrap['eigvals']['const']
         ev_new_const = cont_rewrap['eigvals']['const_rewrap']
-        ax.scatter(
-            np.angle(ev_const),
-            np.abs(ev_const),
-        )
-        ax.scatter(
-            np.angle(ev_new_const),
-            np.abs(ev_new_const),
-            marker='.',
-        )
+        style = {
+            's': 50,
+            'edgecolors': 'w',
+            'linewidth': 0.25,
+            'zorder': 2,
+        }
+        for a in [ax, axins]:
+            a.plot(
+                theta,
+                np.ones(theta.shape),
+                linestyle='--',
+                color=colors['boundary'],
+            )
+            a.scatter(
+                np.angle(ev_const),
+                np.abs(ev_const),
+                marker='o',
+                color=colors['ev_const'],
+                label=labels['ev_const'],
+                **style,
+            )
+            a.scatter(
+                np.angle(ev_new_const),
+                np.abs(ev_new_const),
+                marker='.',
+                color=colors['ev_new_const'],
+                label=labels['ev_new_const'],
+                **style,
+            )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        fig.legend(
+            handles=[
+                ax.get_children()[1],
+                ax.get_children()[2],
+            ],
+            loc='lower left',
+            ncol=1,
+            handlelength=1,
+            # bbox_to_anchor=(0.5, 0),
+        )
+        # Set limits for zoomed plot
+        rmin = 0.70
+        rmax = 1.05
+        thmax = np.pi / 16
+        axins.set_rlim(rmin, rmax)
+        axins.set_thetalim(-thmax, thmax)
+        # Border line width and color
+        border_lw = 1
+        border_color = 'k'
+        # Plot border of zoomed area
+        thb = np.linspace(-thmax, thmax, 1000)
+        ax.plot(
+            thb,
+            rmin * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            thb,
+            rmax * np.ones_like(thb),
+            border_color,
+            linewidth=border_lw,
+        )
+        rb = np.linspace(rmin, rmax, 1000)
+        ax.plot(
+            thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        ax.plot(
+            -thmax * np.ones_like(rb),
+            rb,
+            border_color,
+            linewidth=border_lw,
+        )
+        # Create lines linking border to zoomed plot
+        axins.annotate(
+            '',
+            xy=(thmax, rmax),
+            xycoords=ax.transData,
+            xytext=(thmax, rmax),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
+        axins.annotate(
+            '',
+            xy=(thmax, rmin),
+            xycoords=ax.transData,
+            xytext=(thmax, rmin),
+            textcoords=axins.transData,
+            arrowprops={
+                'arrowstyle': '-',
+                'linewidth': border_lw,
+                'color': border_color,
+                'shrinkA': 0,
+                'shrinkB': 0,
+            },
+        )
     elif figure_path.stem == 'controller_rewrap_pred_lstsq':
         fig, ax = plt.subplots(4, 1, sharex=True)
         X_test = pykoop.split_episodes(
