@@ -1140,6 +1140,8 @@ def action_plot_paper_figures(
     colors = {
         'ref': OKABE_ITO['black'],
         'boundary': OKABE_ITO['black'],
+        'cl_reg': OKABE_ITO['sky blue'],
+        'ol_reg': OKABE_ITO['orange'],
         'cl_score_cl_reg': OKABE_ITO['blue'],
         'cl_score_ol_reg': OKABE_ITO['vermillion'],
         'ol_score_cl_reg': OKABE_ITO['sky blue'],
@@ -1147,6 +1149,8 @@ def action_plot_paper_figures(
     }
     labels = {
         'ref': 'Measured',
+        'cl_reg': 'CL EDMD',
+        'ol_reg': 'EDMD',
         'cl_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{f}$',
         'cl_score_ol_reg': r'EDMD, $\alpha^\mathrm{f}$',
         'ol_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{p}$',
@@ -1171,14 +1175,14 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             spect_rad['cl_from_ol'],
-            color=colors['ol_score_ol_reg'],
-            label='EDMD',
+            color=colors['ol_reg'],
+            label=labels['ol_reg'],
         )
         ax.semilogx(
             alpha,
             spect_rad['cl_from_cl'],
-            color=colors['ol_score_cl_reg'],
-            label='CL EDMD',
+            color=colors['cl_reg'],
+            label=labels['cl_reg'],
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{f})$')
         ax.set_xlabel(r'$\alpha$')
@@ -1200,14 +1204,14 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             spect_rad['ol_from_ol'],
-            color=colors['ol_score_ol_reg'],
-            label='EDMD',
+            color=colors['ol_reg'],
+            label=labels['ol_reg'],
         )
         ax.semilogx(
             alpha,
             spect_rad['ol_from_cl'],
-            color=colors['ol_score_cl_reg'],
-            label='CL EDMD',
+            color=colors['cl_reg'],
+            label=labels['cl_reg'],
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{p})$')
         ax.set_xlabel(r'$\alpha$')
@@ -1223,14 +1227,14 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             r2['cl_from_ol'],
-            color=colors['ol_score_ol_reg'],
-            label='EDMD',
+            color=colors['ol_reg'],
+            label=labels['ol_reg'],
         )
         ax.semilogx(
             alpha,
             r2['cl_from_cl'],
-            color=colors['ol_score_cl_reg'],
-            label='CL EDMD',
+            color=colors['cl_reg'],
+            label=labels['cl_reg'],
         )
         ax.set_ylabel(r'Closed-loop $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
@@ -1247,14 +1251,14 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             r2['ol_from_ol'],
-            color=colors['ol_score_ol_reg'],
-            label='EDMD',
+            color=colors['ol_reg'],
+            label=labels['ol_reg'],
         )
         ax.semilogx(
             alpha,
             r2['ol_from_cl'],
-            color=colors['ol_score_cl_reg'],
-            label='CL EDMD',
+            color=colors['cl_reg'],
+            label=labels['cl_reg'],
         )
         ax.set_ylabel(r'Plant $R^2$ score')
         ax.set_xlabel(r'$\alpha$')
