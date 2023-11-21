@@ -1137,13 +1137,20 @@ def action_plot_paper_figures(
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     # Set colors
-    c = {
+    colors = {
         'ref': OKABE_ITO['black'],
         'boundary': OKABE_ITO['black'],
         'cl_score_cl_reg': OKABE_ITO['blue'],
         'cl_score_ol_reg': OKABE_ITO['vermillion'],
         'ol_score_cl_reg': OKABE_ITO['sky blue'],
         'ol_score_ol_reg': OKABE_ITO['orange'],
+    }
+    labels = {
+        'ref': 'Measured',
+        'cl_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{f}$',
+        'cl_score_ol_reg': r'EDMD, $\alpha^\mathrm{f}$',
+        'ol_score_cl_reg': r'CL EDMD, $\alpha^\mathrm{p}$',
+        'ol_score_ol_reg': r'EDMD, $\alpha^\mathrm{p}$',
     }
     # Set test episode to plot
     test_ep = 0
@@ -1159,18 +1166,18 @@ def action_plot_paper_figures(
             alpha,
             np.ones_like(alpha),
             linestyle='--',
-            color=c['boundary'],
+            color=colors['boundary'],
         )
         ax.semilogx(
             alpha,
             spect_rad['cl_from_ol'],
-            color=c['ol_score_ol_reg'],
+            color=colors['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             spect_rad['cl_from_cl'],
-            color=c['ol_score_cl_reg'],
+            color=colors['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{f})$')
@@ -1188,18 +1195,18 @@ def action_plot_paper_figures(
             alpha,
             np.ones_like(alpha),
             linestyle='--',
-            color=c['boundary'],
+            color=colors['boundary'],
         )
         ax.semilogx(
             alpha,
             spect_rad['ol_from_ol'],
-            color=c['ol_score_ol_reg'],
+            color=colors['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             spect_rad['ol_from_cl'],
-            color=c['ol_score_cl_reg'],
+            color=colors['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'$\rho(\mathbf{A}^\mathrm{p})$')
@@ -1216,13 +1223,13 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             r2['cl_from_ol'],
-            color=c['ol_score_ol_reg'],
+            color=colors['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             r2['cl_from_cl'],
-            color=c['ol_score_cl_reg'],
+            color=colors['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'Closed-loop $R^2$ score')
@@ -1240,13 +1247,13 @@ def action_plot_paper_figures(
         ax.semilogx(
             alpha,
             r2['ol_from_ol'],
-            color=c['ol_score_ol_reg'],
+            color=colors['ol_score_ol_reg'],
             label='EDMD',
         )
         ax.semilogx(
             alpha,
             r2['ol_from_cl'],
-            color=c['ol_score_cl_reg'],
+            color=colors['ol_score_cl_reg'],
             label='CL EDMD',
         )
         ax.set_ylabel(r'Plant $R^2$ score')
@@ -1283,38 +1290,38 @@ def action_plot_paper_figures(
                 theta,
                 np.ones(theta.shape),
                 linestyle='--',
-                color=c['boundary'],
+                color=colors['boundary'],
             )
             a.scatter(
                 np.angle(ev['cl_score_ol_reg']),
                 np.abs(ev['cl_score_ol_reg']),
-                color=c['cl_score_ol_reg'],
+                color=colors['cl_score_ol_reg'],
                 marker='s',
-                label=r'EDMD, $\alpha^\mathrm{f}$',
+                label=labels['cl_score_ol_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['cl_score_cl_reg']),
                 np.abs(ev['cl_score_cl_reg']),
-                color=c['cl_score_cl_reg'],
+                color=colors['cl_score_cl_reg'],
                 marker='o',
-                label=r'CL EDMD, $\alpha^\mathrm{f}$',
+                label=labels['cl_score_cl_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['ol_score_ol_reg']),
                 np.abs(ev['ol_score_ol_reg']),
-                color=c['ol_score_ol_reg'],
+                color=colors['ol_score_ol_reg'],
                 marker='D',
-                label=r'EDMD, $\alpha^\mathrm{p}$',
+                label=labels['ol_score_ol_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['ol_score_cl_reg']),
                 np.abs(ev['ol_score_cl_reg']),
-                color=c['ol_score_cl_reg'],
+                color=colors['ol_score_cl_reg'],
                 marker='v',
-                label=r'CL EDMD, $\alpha^\mathrm{p}$',
+                label=labels['ol_score_cl_reg'],
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
@@ -1426,38 +1433,38 @@ def action_plot_paper_figures(
                 theta,
                 np.ones(theta.shape),
                 linestyle='--',
-                color=c['boundary'],
+                color=colors['boundary'],
             )
             a.scatter(
                 np.angle(ev['cl_score_ol_reg']),
                 np.abs(ev['cl_score_ol_reg']),
-                color=c['cl_score_ol_reg'],
+                color=colors['cl_score_ol_reg'],
                 marker='s',
-                label=r'EDMD, $\alpha^\mathrm{f}$',
+                label=labels['cl_score_ol_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['cl_score_cl_reg']),
                 np.abs(ev['cl_score_cl_reg']),
-                color=c['cl_score_cl_reg'],
+                color=colors['cl_score_cl_reg'],
                 marker='o',
-                label=r'CL EDMD, $\alpha^\mathrm{f}$',
+                label=labels['cl_score_cl_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['ol_score_ol_reg']),
                 np.abs(ev['ol_score_ol_reg']),
-                color=c['ol_score_ol_reg'],
+                color=colors['ol_score_ol_reg'],
                 marker='D',
-                label=r'EDMD, $\alpha^\mathrm{p}$',
+                label=labels['ol_score_ol_reg'],
                 **style,
             )
             a.scatter(
                 np.angle(ev['ol_score_cl_reg']),
                 np.abs(ev['ol_score_cl_reg']),
-                color=c['ol_score_cl_reg'],
+                color=colors['ol_score_cl_reg'],
                 marker='v',
-                label=r'CL EDMD, $\alpha^\mathrm{p}$',
+                label=labels['ol_score_cl_reg'],
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
@@ -1576,27 +1583,44 @@ def action_plot_paper_figures(
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
-        fig, ax = plt.subplots(4, 1)
+        t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW * 1.4),
+        )
         for i, a in enumerate(ax.ravel()):
             a.plot(
+                t,
                 X_test['cl_from_cl'][:, i],
-                label='true',
+                color=colors['ref'],
+                label=labels['ref'],
             )
             a.plot(
-                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
-                label='cl_score_cl_reg',
-            )
-            a.plot(
+                t,
                 Xp_cl_score_ol_reg['cl_from_ol'][:, i],
-                label='cl_score_ol_reg',
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
             )
             a.plot(
-                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
-                label='ol_score_cl_reg',
+                t,
+                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
             )
             a.plot(
+                t,
                 Xp_ol_score_ol_reg['cl_from_ol'][:, i],
-                label='ol_score_ol_reg',
+                color=colors['ol_score_ol_reg'],
+                label=labels['ol_score_ol_reg'],
+            )
+            a.plot(
+                t,
+                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+                color=colors['ol_score_cl_reg'],
+                label=labels['ol_score_cl_reg'],
             )
             _autoset_ylim(a, [
                 X_test['cl_from_cl'][:, i],
@@ -1604,7 +1628,27 @@ def action_plot_paper_figures(
                 Xp_cl_score_ol_reg['cl_from_ol'][:, i],
                 Xp_ol_score_cl_reg['cl_from_cl'][:, i],
             ])
-        ax[0].legend()
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
+        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylim([-0.35, 0.35])
+        fig.align_ylabels()
+        ax[3].set_yticks([-0.3, 0, 0.3])
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, -0.18),
+        )
     elif figure_path.stem == 'predictions_ol':
         X_test = {
             key: pykoop.split_episodes(
@@ -1641,34 +1685,76 @@ def action_plot_paper_figures(
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
-        fig, ax = plt.subplots(2, 1)
-        for i, a in enumerate(ax.ravel()):
-            a.plot(
+        t = np.arange(X_test['ol_from_ol'].shape[0]) * exp['t_step']
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        for i in range(2):
+            ax[i].plot(
+                t,
                 X_test['ol_from_ol'][:, i],
-                label='true',
+                color=colors['ref'],
+                label=labels['ref'],
             )
-            a.plot(
-                Xp_cl_score_cl_reg['ol_from_cl'][:, i],
-                label='cl_score_cl_reg',
-            )
-            a.plot(
+            ax[i].plot(
+                t,
                 Xp_cl_score_ol_reg['ol_from_ol'][:, i],
-                label='cl_score_ol_reg',
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
             )
-            a.plot(
-                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
-                label='ol_score_cl_reg',
+            ax[i].plot(
+                t,
+                Xp_cl_score_cl_reg['ol_from_cl'][:, i],
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
             )
-            a.plot(
+            ax[i].plot(
+                t,
                 Xp_ol_score_ol_reg['ol_from_ol'][:, i],
-                label='ol_score_ol_reg',
+                color=colors['ol_score_ol_reg'],
+                label=labels['ol_score_ol_reg'],
             )
-            _autoset_ylim(a, [
+            ax[i].plot(
+                t,
+                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                color=colors['ol_score_cl_reg'],
+                label=labels['ol_score_cl_reg'],
+            )
+            _autoset_ylim(ax[i], [
                 X_test['ol_from_ol'][:, i],
                 Xp_ol_score_cl_reg['ol_from_cl'][:, i],
                 Xp_ol_score_ol_reg['ol_from_ol'][:, i],
             ])
-        ax[0].legend()
+        ax[2].plot(
+            t,
+            X_test['ol_from_ol'][:, 2],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        ax[1].set_ylim([-0.35, 0.35])
+        ax[1].set_yticks([-0.3, 0, 0.3])
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, -0.25),
+        )
     elif figure_path.stem == 'inputs_cl':
         fig, ax = plt.subplots(
             3,
@@ -1685,15 +1771,15 @@ def action_plot_paper_figures(
             for (key, value) in pred['X_test'].items()
         }
         t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
-        ax[0].plot(t, X_test['cl_from_cl'][:, 4], color=c['ref'])
-        ax[1].plot(t, X_test['cl_from_cl'][:, 5], color=c['ref'])
-        ax[2].plot(t, X_test['cl_from_cl'][:, 6], color=c['ref'])
+        ax[0].plot(t, X_test['cl_from_cl'][:, 4], color=colors['ref'])
+        ax[1].plot(t, X_test['cl_from_cl'][:, 5], color=colors['ref'])
+        ax[2].plot(t, X_test['cl_from_cl'][:, 6], color=colors['ref'])
         ax[0].set_ylabel(r'$r_1(t)$ (rad)')
         ax[1].set_ylabel(r'$r_2(t)$ (rad)')
         ax[2].set_ylabel(r'$f(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
-        ax[2].set_xlim([2, 16])
-        ax[2].set_xticks([3, 6, 9, 12, 15])
+        # ax[2].set_xlim([2, 16])
+        # ax[2].set_xticks([3, 6, 9, 12, 15])
         fig.align_ylabels()
     elif figure_path.stem == 'controller_rewrap_eig_lstsq':
         fig = plt.figure()
