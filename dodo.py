@@ -43,7 +43,7 @@ OKABE_ITO = {
 LW = 3.5
 
 # Set gobal Matplotlib options
-plt.rc('lines', linewidth=2)
+plt.rc('lines', linewidth=1.5)
 plt.rc('axes', grid=True)
 plt.rc('grid', linestyle='--')
 # Set LaTeX rendering only if available
@@ -51,7 +51,7 @@ usetex = True if shutil.which('latex') else False
 if usetex:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('font', size=12)
+    plt.rc('font', size=9)
     plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
 
@@ -1339,6 +1339,7 @@ def action_plot_paper_figures(
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
         ax.set_rlim([0, 2.24])
+        ax.set_rticks([0.0, 0.5, 1.0, 1.5, 2.0])
         fig.legend(
             handles=[
                 ax.get_children()[3],
@@ -1349,7 +1350,7 @@ def action_plot_paper_figures(
             loc='lower center',
             ncol=2,
             handlelength=1,
-            bbox_to_anchor=(0.5, 0),
+            bbox_to_anchor=(0.5, 0.04),
         )
         # Set limits for zoomed plot
         rmin = 0.85
@@ -1492,7 +1493,7 @@ def action_plot_paper_figures(
             loc='lower center',
             ncol=2,
             handlelength=1,
-            bbox_to_anchor=(0.5, 0),
+            bbox_to_anchor=(0.5, 0.04),
         )
         # Set limits for zoomed plot
         rmin = 0.90
@@ -1652,14 +1653,14 @@ def action_plot_paper_figures(
             handles=[
                 ax[0].get_lines()[3],
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[4],
                 ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
             ],
             loc='lower center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.18),
+            bbox_to_anchor=(0.5, -0.10),
         )
     elif figure_path.stem == 'predictions_ol':
         X_test = {
@@ -1758,14 +1759,14 @@ def action_plot_paper_figures(
             handles=[
                 ax[0].get_lines()[3],
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[4],
                 ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
             ],
             loc='lower center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.25),
+            bbox_to_anchor=(0.5, -0.14),
         )
     elif figure_path.stem == 'inputs_cl':
         fig, ax = plt.subplots(
@@ -2075,13 +2076,13 @@ def action_plot_paper_figures(
         fig.legend(
             handles=[
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
             ],
             loc='lower center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.13),
+            bbox_to_anchor=(0.5, -0.06),
         )
     elif figure_path.stem == 'controller_rewrap_pred_const':
         fig, ax = plt.subplots(
@@ -2135,13 +2136,13 @@ def action_plot_paper_figures(
         fig.legend(
             handles=[
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
             ],
             loc='lower center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.13),
+            bbox_to_anchor=(0.5, -0.06),
         )
     else:
         raise ValueError('Invalid `figure_path`.')
