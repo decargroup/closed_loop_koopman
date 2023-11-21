@@ -1257,10 +1257,10 @@ def action_plot_paper_figures(
     elif figure_path.stem == 'eigenvalues_cl':
         fig = plt.figure(
             constrained_layout=True,
-            figsize=(LW, LW),
+            figsize=(LW, LW * 1.4),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.4, 0.05, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1290,6 +1290,7 @@ def action_plot_paper_figures(
                 np.abs(ev['cl_score_ol_reg']),
                 color=c['cl_score_ol_reg'],
                 marker='s',
+                label=r'EDMD, $\alpha^\mathrm{f}$',
                 **style,
             )
             a.scatter(
@@ -1297,6 +1298,7 @@ def action_plot_paper_figures(
                 np.abs(ev['cl_score_cl_reg']),
                 color=c['cl_score_cl_reg'],
                 marker='o',
+                label=r'CL EDMD, $\alpha^\mathrm{f}$',
                 **style,
             )
             a.scatter(
@@ -1304,6 +1306,7 @@ def action_plot_paper_figures(
                 np.abs(ev['ol_score_ol_reg']),
                 color=c['ol_score_ol_reg'],
                 marker='D',
+                label=r'EDMD, $\alpha^\mathrm{p}$',
                 **style,
             )
             a.scatter(
@@ -1311,10 +1314,24 @@ def action_plot_paper_figures(
                 np.abs(ev['ol_score_cl_reg']),
                 color=c['ol_score_cl_reg'],
                 marker='v',
+                label=r'CL EDMD, $\alpha^\mathrm{p}$',
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        ax.set_rlim([0, 2.24])
+        fig.legend(
+            handles=[
+                ax.get_children()[3],
+                ax.get_children()[1],
+                ax.get_children()[4],
+                ax.get_children()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0),
+        )
         # Set limits for zoomed plot
         rmin = 0.85
         rmax = 1.05
@@ -1383,10 +1400,10 @@ def action_plot_paper_figures(
     elif figure_path.stem == 'eigenvalues_ol':
         fig = plt.figure(
             constrained_layout=True,
-            figsize=(LW, LW),
+            figsize=(LW, LW * 1.4),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.4, 0.05, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1416,6 +1433,7 @@ def action_plot_paper_figures(
                 np.abs(ev['cl_score_ol_reg']),
                 color=c['cl_score_ol_reg'],
                 marker='s',
+                label=r'EDMD, $\alpha^\mathrm{f}$',
                 **style,
             )
             a.scatter(
@@ -1423,6 +1441,7 @@ def action_plot_paper_figures(
                 np.abs(ev['cl_score_cl_reg']),
                 color=c['cl_score_cl_reg'],
                 marker='o',
+                label=r'CL EDMD, $\alpha^\mathrm{f}$',
                 **style,
             )
             a.scatter(
@@ -1430,6 +1449,7 @@ def action_plot_paper_figures(
                 np.abs(ev['ol_score_ol_reg']),
                 color=c['ol_score_ol_reg'],
                 marker='D',
+                label=r'EDMD, $\alpha^\mathrm{p}$',
                 **style,
             )
             a.scatter(
@@ -1437,10 +1457,24 @@ def action_plot_paper_figures(
                 np.abs(ev['ol_score_cl_reg']),
                 color=c['ol_score_cl_reg'],
                 marker='v',
+                label=r'CL EDMD, $\alpha^\mathrm{p}$',
                 **style,
             )
         ax.set_xlabel(r'$\mathrm{Re}\{\lambda_i\}$')
         ax.set_ylabel(r'$\mathrm{Im}\{\lambda_i\}$', labelpad=30)
+        ax.set_rlim([0, 1.19])
+        fig.legend(
+            handles=[
+                ax.get_children()[3],
+                ax.get_children()[1],
+                ax.get_children()[4],
+                ax.get_children()[2],
+            ],
+            loc='lower center',
+            ncol=2,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0),
+        )
         # Set limits for zoomed plot
         rmin = 0.90
         rmax = 1.05
@@ -1480,7 +1514,7 @@ def action_plot_paper_figures(
         # Create lines linking border to zoomed plot
         axins.annotate(
             '',
-            xy=(-thmax, rmax),
+            xy=(thmax, rmax),
             xycoords=ax.transData,
             xytext=(thmax, rmax),
             textcoords=axins.transData,
@@ -1752,7 +1786,7 @@ def action_plot_paper_figures(
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
-    fig.savefig(figure_path)
+    fig.savefig(figure_path, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
 
 
