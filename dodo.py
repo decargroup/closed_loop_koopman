@@ -1276,7 +1276,7 @@ def action_plot_paper_figures(
     elif figure_path.stem == 'eigenvalues_cl':
         fig = plt.figure(
             constrained_layout=True,
-            figsize=(LW, LW * 1.4),
+            figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
         axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
@@ -1347,10 +1347,9 @@ def action_plot_paper_figures(
                 ax.get_children()[4],
                 ax.get_children()[2],
             ],
-            loc='lower center',
-            ncol=2,
+            loc='lower left',
+            ncol=1,
             handlelength=1,
-            bbox_to_anchor=(0.5, 0.04),
         )
         # Set limits for zoomed plot
         rmin = 0.85
@@ -1420,7 +1419,7 @@ def action_plot_paper_figures(
     elif figure_path.stem == 'eigenvalues_ol':
         fig = plt.figure(
             constrained_layout=True,
-            figsize=(LW, LW * 1.4),
+            figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
         axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
@@ -1490,10 +1489,9 @@ def action_plot_paper_figures(
                 ax.get_children()[4],
                 ax.get_children()[2],
             ],
-            loc='lower center',
-            ncol=2,
+            loc='lower left',
+            ncol=1,
             handlelength=1,
-            bbox_to_anchor=(0.5, 0.04),
         )
         # Set limits for zoomed plot
         rmin = 0.90
@@ -1602,7 +1600,7 @@ def action_plot_paper_figures(
             1,
             sharex=True,
             constrained_layout=True,
-            figsize=(LW, LW * 1.4),
+            figsize=(LW, LW),
         )
         for i, a in enumerate(ax.ravel()):
             a.plot(
@@ -1657,10 +1655,10 @@ def action_plot_paper_figures(
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
             ],
-            loc='lower center',
+            loc='upper center',
             ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.10),
+            bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'predictions_ol':
         X_test = {
@@ -1763,10 +1761,10 @@ def action_plot_paper_figures(
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
             ],
-            loc='lower center',
+            loc='upper center',
             ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.14),
+            bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'inputs_cl':
         fig, ax = plt.subplots(
@@ -1957,7 +1955,6 @@ def action_plot_paper_figures(
             loc='lower left',
             ncol=1,
             handlelength=1,
-            # bbox_to_anchor=(0.5, 0),
         )
         # Set limits for zoomed plot
         rmin = 0.70
@@ -2030,7 +2027,7 @@ def action_plot_paper_figures(
             1,
             sharex=True,
             constrained_layout=True,
-            figsize=(LW, LW * 1.4),
+            figsize=(LW, LW),
         )
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
@@ -2079,10 +2076,10 @@ def action_plot_paper_figures(
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
             ],
-            loc='lower center',
+            loc='upper center',
             ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.06),
+            bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'controller_rewrap_pred_const':
         fig, ax = plt.subplots(
@@ -2090,7 +2087,7 @@ def action_plot_paper_figures(
             1,
             sharex=True,
             constrained_layout=True,
-            figsize=(LW, LW * 1.4),
+            figsize=(LW, LW),
         )
         X_test = pykoop.split_episodes(
             exp['closed_loop']['X_test'],
@@ -2139,10 +2136,10 @@ def action_plot_paper_figures(
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
             ],
-            loc='lower center',
+            loc='upper center',
             ncol=3,
             handlelength=1,
-            bbox_to_anchor=(0.5, -0.06),
+            bbox_to_anchor=(0.5, 0.02),
         )
     else:
         raise ValueError('Invalid `figure_path`.')
