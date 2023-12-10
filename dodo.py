@@ -313,6 +313,8 @@ def task_plot_paper_figures():
         WD.joinpath('build', 'paper_figures', 'eigenvalues_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'errorss_cl.pdf'),
+        WD.joinpath('build', 'paper_figures', 'errorss_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'inputs_cl.pdf'),
         WD.joinpath(
             'build',
@@ -1661,6 +1663,215 @@ def action_plot_paper_figures(
             bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'predictions_ol':
+        X_test = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['X_test'].items()
+        }
+        Xp_cl_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
+        }
+        Xp_cl_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
+        }
+        Xp_ol_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
+        }
+        Xp_ol_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['open_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        t = np.arange(X_test['ol_from_ol'].shape[0]) * exp['t_step']
+        fig, ax = plt.subplots(
+            3,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        for i in range(2):
+            ax[i].plot(
+                t,
+                X_test['ol_from_ol'][:, i],
+                color=colors['ref'],
+                label=labels['ref'],
+            )
+            ax[i].plot(
+                t,
+                Xp_cl_score_ol_reg['ol_from_ol'][:, i],
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
+            )
+            ax[i].plot(
+                t,
+                Xp_cl_score_cl_reg['ol_from_cl'][:, i],
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
+            )
+            ax[i].plot(
+                t,
+                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+                color=colors['ol_score_ol_reg'],
+                label=labels['ol_score_ol_reg'],
+            )
+            ax[i].plot(
+                t,
+                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                color=colors['ol_score_cl_reg'],
+                label=labels['ol_score_cl_reg'],
+            )
+            _autoset_ylim(ax[i], [
+                X_test['ol_from_ol'][:, i],
+                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+            ])
+        ax[2].plot(
+            t,
+            X_test['ol_from_ol'][:, 2],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
+        ax[2].set_xlabel(r'$t$ (s)')
+        ax[1].set_ylim([-0.35, 0.35])
+        ax[1].set_yticks([-0.3, 0, 0.3])
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'errors_cl':
+        X_test = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['X_test'].items()
+        }
+        Xp_cl_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
+        }
+        Xp_cl_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
+        }
+        Xp_ol_score_cl_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
+        }
+        Xp_ol_score_ol_reg = {
+            key: pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        for i, a in enumerate(ax.ravel()):
+            # TODO Compute percent error, then plug it in
+            a.plot(
+                t,
+                X_test['cl_from_cl'][:, i],
+                color=colors['ref'],
+                label=labels['ref'],
+            )
+            a.plot(
+                t,
+                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
+            )
+            a.plot(
+                t,
+                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
+            )
+            a.plot(
+                t,
+                Xp_ol_score_ol_reg['cl_from_ol'][:, i],
+                color=colors['ol_score_ol_reg'],
+                label=labels['ol_score_ol_reg'],
+            )
+            a.plot(
+                t,
+                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+                color=colors['ol_score_cl_reg'],
+                label=labels['ol_score_cl_reg'],
+            )
+            _autoset_ylim(a, [
+                X_test['cl_from_cl'][:, i],
+                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
+                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+            ])
+        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
+        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        fig.align_ylabels()
+        ax[3].set_ylim([-0.35, 0.35])
+        ax[3].set_yticks([-0.3, 0, 0.3])
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'errors_ol':
         X_test = {
             key: pykoop.split_episodes(
                 value,
