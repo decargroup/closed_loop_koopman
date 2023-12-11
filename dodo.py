@@ -1851,11 +1851,10 @@ def action_plot_paper_figures(
                 ls=':',
             )
             a.set_ylim([-120, 120])
-        # TODO Rename tracking error in paper
-        ax[0].set_ylabel(r'$\%e_1^\mathrm{c}(t)$')
-        ax[1].set_ylabel(r'$\%e_2^\mathrm{c}(t)$')
-        ax[2].set_ylabel(r'$\%e_1^\mathrm{p}(t)$ (rad)')
-        ax[3].set_ylabel(r'$\%e_2^\mathrm{p}(t)$ (rad)')
+        ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
+        ax[1].set_ylabel(r'$\Delta x_2^\mathrm{c}(t)$ (\%)')
+        ax[2].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
+        ax[3].set_ylabel(r'$\Delta x_2^\mathrm{p}(t)$ (\%)')
         fig.align_ylabels()
         ax[3].set_xlabel(r'$t$ (s)')
         fig.legend(
@@ -1959,8 +1958,8 @@ def action_plot_paper_figures(
             color=colors['ref'],
             label=labels['ref'],
         )
-        ax[0].set_ylabel(r'$\%e_1^\mathrm{p}(t)$ (rad)')
-        ax[1].set_ylabel(r'$\%e_2^\mathrm{p}(t)$ (rad)')
+        ax[0].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
+        ax[1].set_ylabel(r'$\Delta x_2^\mathrm{p}(t)$ (\%)')
         ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
         fig.align_ylabels()
