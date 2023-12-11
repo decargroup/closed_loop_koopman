@@ -313,8 +313,8 @@ def task_plot_paper_figures():
         WD.joinpath('build', 'paper_figures', 'eigenvalues_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'predictions_ol.pdf'),
-        WD.joinpath('build', 'paper_figures', 'errorss_cl.pdf'),
-        WD.joinpath('build', 'paper_figures', 'errorss_ol.pdf'),
+        WD.joinpath('build', 'paper_figures', 'errors_cl.pdf'),
+        WD.joinpath('build', 'paper_figures', 'errors_ol.pdf'),
         WD.joinpath('build', 'paper_figures', 'inputs_cl.pdf'),
         WD.joinpath(
             'build',
@@ -1813,61 +1813,60 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         for i, a in enumerate(ax.ravel()):
-            # TODO Compute percent error, then plug it in
             a.plot(
                 t,
-                X_test['cl_from_cl'][:, i],
-                color=colors['ref'],
-                label=labels['ref'],
-            )
-            a.plot(
-                t,
-                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
-                color=colors['cl_score_ol_reg'],
-                label=labels['cl_score_ol_reg'],
-            )
-            a.plot(
-                t,
-                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
-                color=colors['cl_score_cl_reg'],
-                label=labels['cl_score_cl_reg'],
-            )
-            a.plot(
-                t,
-                Xp_ol_score_ol_reg['cl_from_ol'][:, i],
+                _percent_error(
+                    X_test['cl_from_cl'][:, i],
+                    Xp_ol_score_ol_reg['cl_from_ol'][:, i],
+                ),
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
             )
             a.plot(
                 t,
-                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+                _percent_error(
+                    X_test['cl_from_cl'][:, i],
+                    Xp_ol_score_cl_reg['cl_from_cl'][:, i],
+                ),
                 color=colors['ol_score_cl_reg'],
                 label=labels['ol_score_cl_reg'],
             )
-            _autoset_ylim(a, [
-                X_test['cl_from_cl'][:, i],
-                Xp_cl_score_cl_reg['cl_from_cl'][:, i],
-                Xp_cl_score_ol_reg['cl_from_ol'][:, i],
-                Xp_ol_score_cl_reg['cl_from_cl'][:, i],
-            ])
-        ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
-        ax[1].set_ylabel(r'$x_2^\mathrm{c}(t)$')
-        ax[2].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
-        ax[3].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+            a.plot(
+                t,
+                _percent_error(
+                    X_test['cl_from_cl'][:, i],
+                    Xp_cl_score_ol_reg['cl_from_ol'][:, i],
+                ),
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
+            )
+            a.plot(
+                t,
+                _percent_error(
+                    X_test['cl_from_cl'][:, i],
+                    Xp_cl_score_cl_reg['cl_from_cl'][:, i],
+                ),
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
+                ls=':',
+            )
+            a.set_ylim([-120, 120])
+        # TODO Rename tracking error in paper
+        ax[0].set_ylabel(r'$\%e_1^\mathrm{c}(t)$')
+        ax[1].set_ylabel(r'$\%e_2^\mathrm{c}(t)$')
+        ax[2].set_ylabel(r'$\%e_1^\mathrm{p}(t)$ (rad)')
+        ax[3].set_ylabel(r'$\%e_2^\mathrm{p}(t)$ (rad)')
         fig.align_ylabels()
-        ax[3].set_ylim([-0.35, 0.35])
-        ax[3].set_yticks([-0.3, 0, 0.3])
         ax[3].set_xlabel(r'$t$ (s)')
         fig.legend(
             handles=[
-                ax[0].get_lines()[3],
-                ax[0].get_lines()[1],
-                ax[0].get_lines()[4],
-                ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[3],
             ],
             loc='upper center',
-            ncol=3,
+            ncol=2,
             handlelength=1,
             bbox_to_anchor=(0.5, 0.02),
         )
@@ -1918,59 +1917,60 @@ def action_plot_paper_figures(
         for i in range(2):
             ax[i].plot(
                 t,
-                X_test['ol_from_ol'][:, i],
-                color=colors['ref'],
-                label=labels['ref'],
+                _percent_error(
+                    X_test['ol_from_ol'][:, i],
+                    Xp_ol_score_cl_reg['ol_from_cl'][:, i],
+                ),
+                color=colors['ol_score_cl_reg'],
+                label=labels['ol_score_cl_reg'],
             )
             ax[i].plot(
                 t,
-                Xp_cl_score_ol_reg['ol_from_ol'][:, i],
-                color=colors['cl_score_ol_reg'],
-                label=labels['cl_score_ol_reg'],
-            )
-            ax[i].plot(
-                t,
-                Xp_cl_score_cl_reg['ol_from_cl'][:, i],
-                color=colors['cl_score_cl_reg'],
-                label=labels['cl_score_cl_reg'],
-            )
-            ax[i].plot(
-                t,
-                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+                _percent_error(
+                    X_test['ol_from_ol'][:, i],
+                    Xp_ol_score_ol_reg['ol_from_ol'][:, i],
+                ),
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
             )
             ax[i].plot(
                 t,
-                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
-                color=colors['ol_score_cl_reg'],
-                label=labels['ol_score_cl_reg'],
+                _percent_error(
+                    X_test['ol_from_ol'][:, i],
+                    Xp_cl_score_ol_reg['ol_from_ol'][:, i],
+                ),
+                color=colors['cl_score_ol_reg'],
+                label=labels['cl_score_ol_reg'],
             )
-            _autoset_ylim(ax[i], [
-                X_test['ol_from_ol'][:, i],
-                Xp_ol_score_cl_reg['ol_from_cl'][:, i],
-                Xp_ol_score_ol_reg['ol_from_ol'][:, i],
-            ])
+            ax[i].plot(
+                t,
+                _percent_error(
+                    X_test['ol_from_ol'][:, i],
+                    Xp_cl_score_cl_reg['ol_from_cl'][:, i],
+                ),
+                color=colors['cl_score_cl_reg'],
+                label=labels['cl_score_cl_reg'],
+                ls=':',
+            )
+            ax[i].set_ylim([-120, 120])
         ax[2].plot(
             t,
             X_test['ol_from_ol'][:, 2],
             color=colors['ref'],
             label=labels['ref'],
         )
-        ax[0].set_ylabel(r'$x_1^\mathrm{p}(t)$ (rad)')
-        ax[1].set_ylabel(r'$x_2^\mathrm{p}(t)$ (rad)')
+        ax[0].set_ylabel(r'$\%e_1^\mathrm{p}(t)$ (rad)')
+        ax[1].set_ylabel(r'$\%e_2^\mathrm{p}(t)$ (rad)')
         ax[2].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (V)')
         ax[2].set_xlabel(r'$t$ (s)')
-        ax[1].set_ylim([-0.35, 0.35])
-        ax[1].set_yticks([-0.3, 0, 0.3])
         fig.align_ylabels()
         fig.legend(
             handles=[
-                ax[0].get_lines()[3],
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[4],
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
+                ax[0].get_lines()[3],
+                ax[2].get_lines()[0],
             ],
             loc='upper center',
             ncol=3,
@@ -2423,3 +2423,25 @@ def _autoset_ylim(
         max = np.max(Xc) * scale
         min = np.min(Xc) * scale
     ax.set_ylim([min, max])
+
+
+def _percent_error(reference: np.ndarray, predicted: np.ndarray) -> np.ndarray:
+    """Calculate percent error from reference and predicted trajectories.
+
+    Normalized using maximum amplitude of reference trajectory.
+
+    Parameters
+    ----------
+    reference : np.ndarray
+        Reference trajectory, witout episode feature.
+    predicted : np.ndarray
+        Predicted trajectory, witout episode feature.
+
+    Returns
+    -------
+    np.ndarray
+        Percent error.
+    """
+    ampl = np.max(np.abs(reference))
+    percent_error = (reference - predicted) / ampl * 100
+    return percent_error
