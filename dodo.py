@@ -1622,6 +1622,7 @@ def action_plot_paper_figures(
                 Xp_cl_score_cl_reg['cl_from_cl'][:, i],
                 color=colors['cl_score_cl_reg'],
                 label=labels['cl_score_cl_reg'],
+                linestyle=':',
             )
             a.plot(
                 t,
@@ -1724,6 +1725,7 @@ def action_plot_paper_figures(
                 Xp_cl_score_cl_reg['ol_from_cl'][:, i],
                 color=colors['cl_score_cl_reg'],
                 label=labels['cl_score_cl_reg'],
+                linestyle=':',
             )
             ax[i].plot(
                 t,
@@ -1848,7 +1850,7 @@ def action_plot_paper_figures(
                 ),
                 color=colors['cl_score_cl_reg'],
                 label=labels['cl_score_cl_reg'],
-                ls=':',
+                linestyle=':',
             )
             a.set_ylim([-120, 120])
         ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
@@ -1949,7 +1951,7 @@ def action_plot_paper_figures(
                 ),
                 color=colors['cl_score_cl_reg'],
                 label=labels['cl_score_cl_reg'],
-                ls=':',
+                linestyle=':',
             )
             ax[i].set_ylim([-120, 120])
         ax[2].plot(
