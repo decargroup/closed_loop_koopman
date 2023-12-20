@@ -117,10 +117,8 @@ Each CSV file in `dataset/` contains one experimental episode. The columns are:
 | `alpha` | Measured pendulum angle (rad) |
 | `control_output` | Control signal calculated by the controller (V) |
 | `feedforward` | Feedforward signal to be added to `control_output` (V) |
-| `plant_input` | `control_output` summed with `feedforward` (V), saturated
-between -10V and 10V. |
-| `saturation` | Signal indicating if saturation is active. -1 if saturating in
-the negative direction, +1 if saturating in the positive direction. |
+| `plant_input` | `control_output` summed with `feedforward` (V), saturated between -10V and 10V. |
+| `saturation` | Signal indicating if saturation is active. -1 if saturating in the negative direction, +1 if saturating in the positive direction. |
 
 ## Repository Layout
 
