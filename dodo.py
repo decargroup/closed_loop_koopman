@@ -57,10 +57,8 @@ if usetex:
 
 def task_preprocess_experiments():
     """Pickle raw CSV files."""
-    # TODO Remove test controller if it's not used
     datasets = [
         ('controller_20230828', 'training_controller'),
-        ('controller_20230915', 'test_controller'),
     ]
     for (path, name) in datasets:
         dataset = WD.joinpath('dataset').joinpath(path)
