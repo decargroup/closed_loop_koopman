@@ -336,6 +336,16 @@ def task_plot_paper_figures():
             'paper_figures',
             'controller_rewrap_pred_const.pdf',
         ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_error_lstsq.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'controller_rewrap_error_const.pdf',
+        ),
     ]
     for figure in figures:
         yield {
@@ -2332,6 +2342,7 @@ def action_plot_paper_figures(
                 X_pred_const_rewrap[:, i],
                 color=colors['new_const'],
                 label=labels['new_const'],
+                linestyle=':',
             )
             _autoset_ylim(ax[i], [X_test[:, i], X_pred_const[:, i]])
         ax[0].set_ylabel(r'$x_1^\mathrm{c}(t)$')
@@ -2347,6 +2358,121 @@ def action_plot_paper_figures(
                 ax[0].get_lines()[1],
                 ax[0].get_lines()[2],
                 ax[0].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'controller_rewrap_error_lstsq':
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        X_test = pykoop.split_episodes(
+            exp['closed_loop']['X_test'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        X_pred_lstsq = pykoop.split_episodes(
+            cont_rewrap['X_pred']['lstsq'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        X_pred_lstsq_rewrap = pykoop.split_episodes(
+            cont_rewrap['X_pred']['lstsq_rewrap'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        t = np.arange(X_pred_lstsq.shape[0]) * exp['t_step']
+        for i in range(ax.shape[0]):
+            ax[i].plot(
+                t,
+                _percent_error(
+                    X_test[:, i],
+                    X_pred_lstsq[:, i],
+                ),
+                color=colors['lstsq'],
+                label=labels['lstsq'],
+            )
+            ax[i].plot(
+                t,
+                _percent_error(
+                    X_test[:, i],
+                    X_pred_lstsq_rewrap[:, i],
+                ),
+                color=colors['new_lstsq'],
+                label=labels['new_lstsq'],
+            )
+            ax[i].set_ylim([-60, 60])
+        ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
+        ax[1].set_ylabel(r'$\Delta x_2^\mathrm{c}(t)$ (\%)')
+        ax[2].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
+        ax[3].set_ylabel(r'$\Delta x_2^\mathrm{p}(t)$ (\%)')
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'controller_rewrap_error_const':
+        fig, ax = plt.subplots(
+            4,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        X_test = pykoop.split_episodes(
+            exp['closed_loop']['X_test'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        X_pred_const = pykoop.split_episodes(
+            cont_rewrap['X_pred']['const'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        X_pred_const_rewrap = pykoop.split_episodes(
+            cont_rewrap['X_pred']['const'],
+            episode_feature=exp['closed_loop']['episode_feature'],
+        )[test_ep][1]
+        t = np.arange(X_pred_const.shape[0]) * exp['t_step']
+        for i in range(ax.shape[0]):
+            ax[i].plot(
+                t,
+                _percent_error(
+                    X_test[:, i],
+                    X_pred_const[:, i],
+                ),
+                color=colors['const'],
+                label=labels['const'],
+            )
+            ax[i].plot(
+                t,
+                _percent_error(
+                    X_test[:, i],
+                    X_pred_const_rewrap[:, i],
+                ),
+                color=colors['new_const'],
+                label=labels['new_const'],
+                linestyle=':',
+            )
+            ax[i].set_ylim([-60, 60])
+        ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
+        ax[1].set_ylabel(r'$\Delta x_2^\mathrm{c}(t)$ (\%)')
+        ax[2].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
+        ax[3].set_ylabel(r'$\Delta x_2^\mathrm{p}(t)$ (\%)')
+        ax[3].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
             ],
             loc='upper center',
             ncol=3,
