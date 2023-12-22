@@ -20,10 +20,6 @@ paper were run on Windows 10 with Python 3.10.9. The `pykoop` library supports
 any version of Python above 3.7.12. You can install Python from your package
 manager or from the [official website](https://www.python.org/downloads/).
 
-The performance statistics presented are from the [MOSEK
-solver](https://www.mosek.com/) running with 16 threads on a PC with an Intel
-Core i7-10700K processor and 64 GiB of RAM.
-
 ## Installation
 
 To clone the repository, run
