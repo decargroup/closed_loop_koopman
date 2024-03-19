@@ -81,7 +81,7 @@ def task_preprocess_experiments():
 
 def task_plot_experiments():
     """Plot pickled data."""
-    datasets = ['training_controller', 'test_controller']
+    datasets = ['training_controller']
     for name in datasets:
         experiment = WD.joinpath(
             'build',
