@@ -1570,35 +1570,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'predictions_cl':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
@@ -1673,35 +1678,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'predictions_ol':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
@@ -1780,35 +1790,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'errors_cl':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
@@ -1881,35 +1896,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'errors_ol':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
@@ -1995,7 +2015,8 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
