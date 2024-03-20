@@ -3,7 +3,7 @@
 import collections
 import pathlib
 import shutil
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import control
 import doit
@@ -11,6 +11,7 @@ import joblib
 import numpy as np
 import pykoop
 import scipy.linalg
+import sippy
 import sklearn.model_selection
 import tomli
 from matplotlib import pyplot as plt
@@ -179,6 +180,29 @@ def task_run_prediction():
     }
 
 
+def task_run_sysid_prediction():
+    """Run system ID prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
+    return {
+        'actions': [(action_run_sysid_prediction, (
+            experiment,
+            predictions,
+        ))],
+        'file_dep': [experiment],
+        'targets': [predictions],
+        'clean': True,
+    }
+
+
 def task_score_prediction():
     """Score prediction for all test episodes."""
     experiment = WD.joinpath(
@@ -203,6 +227,42 @@ def task_score_prediction():
     )
     return {
         'actions': [(action_score_prediction, (
+            experiment,
+            predictions,
+            scores_pickle,
+            scores_csv,
+        ))],
+        'file_dep': [experiment, predictions],
+        'targets': [scores_pickle, scores_csv],
+        'clean':
+        True,
+    }
+
+
+def task_score_sysid_prediction():
+    """Score system ID prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
+    scores_pickle = WD.joinpath(
+        'build',
+        'scores_sysid',
+        'scores_sysid.pickle',
+    )
+    scores_csv = WD.joinpath(
+        'build',
+        'scores_sysid',
+        'scores_sysid.csv',
+    )
+    return {
+        'actions': [(action_score_sysid_prediction, (
             experiment,
             predictions,
             scores_pickle,
@@ -292,6 +352,11 @@ def task_plot_paper_figures():
         'predictions',
         'predictions.pickle',
     )
+    predictions_sysid = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
     spectral_radii = WD.joinpath(
         'build',
         'spectral_radii',
@@ -353,6 +418,7 @@ def task_plot_paper_figures():
                 experiment,
                 cross_validation,
                 predictions,
+                predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
                 figure,
@@ -361,6 +427,7 @@ def task_plot_paper_figures():
                 experiment,
                 cross_validation,
                 predictions,
+                predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
             ],
@@ -871,6 +938,80 @@ def action_run_prediction(
     joblib.dump(predictions, predictions_path)
 
 
+def action_run_sysid_prediction(
+    experiment_path: pathlib.Path,
+    sysid_predictions_path: pathlib.Path,
+):
+    """Run system ID prediction for all test episodes."""
+    # Load dependencies
+    exp = joblib.load(experiment_path)
+    # Load training and test data
+    X_train_cl = exp['closed_loop']['X_train'][:, (0, 3, 4, 5, 6, 7)]
+    X_test_cl = exp['closed_loop']['X_test'][:, (0, 3, 4, 5, 6, 7)]
+    X_test_ol = exp['open_loop']['X_test']
+    X_test = {
+        'cl': X_test_cl,
+        'ol': X_test_ol,
+    }
+    eps_train = pykoop.split_episodes(X_train_cl, episode_feature=True)
+    eps_test_cl = pykoop.split_episodes(X_test_cl, episode_feature=True)
+    eps_test_ol = pykoop.split_episodes(X_test_ol, episode_feature=True)
+    # Transfer function order
+    order = 10
+    # Fit transfer matrix for each episode, then average coefficients
+    num_lst = []
+    den_lst = []
+    for _, ep_train in eps_train:
+        id = sippy.system_identification(
+            ep_train[:, :2].T,
+            ep_train[:, 2:].T,
+            'ARX',
+            tsample=exp['t_step'],
+            ARX_orders=[
+                [order, order],
+                [[order, order, order], [order, order, order]],
+                [[0, 0, 0], [0, 0, 0]],
+            ],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    G_cl = control.TransferFunction(num, den, dt=exp['t_step'])
+    # Controller transfer function
+    K = control.ss2tf(
+        control.StateSpace(
+            *exp['closed_loop']['controller'],
+            dt=exp['t_step'],
+        ))
+    # Extract block of CL transfer matrix corresponding to feedforward input
+    G_cl_1 = _combine_tf(_split_tf(G_cl)[:, :1])
+    # Use controller and first block of CL transfer matrix to recover plant TF
+    G_ol = G_cl_1 * (1 - K * G_cl_1)**-1
+    # Run predictions for each episode
+    eps_pred_cl = []
+    for i, ep_test_cl in eps_test_cl:
+        _, Xp_i = control.forced_response(G_cl, U=ep_test_cl[:, 2:].T)
+        eps_pred_cl.append((i, Xp_i.T))
+    eps_pred_ol = []
+    for i, ep_test_ol in eps_test_ol:
+        _, Xp_i = control.forced_response(G_ol, U=ep_test_ol[:, 2:].T)
+        eps_pred_ol.append((i, Xp_i.T))
+    Xp = {
+        'cl': pykoop.combine_episodes(eps_pred_cl, episode_feature=True),
+        'ol': pykoop.combine_episodes(eps_pred_ol, episode_feature=True),
+    }
+    # Save predictions
+    sysid_predictions = {
+        'G_cl': G_cl,
+        'G_ol': G_ol,
+        'Xp': Xp,
+        'X_test': X_test,
+    }
+    sysid_predictions_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(sysid_predictions, sysid_predictions_path)
+
+
 def action_score_prediction(
     experiment_path: pathlib.Path,
     predictions_path: pathlib.Path,
@@ -955,6 +1096,79 @@ def action_score_prediction(
             np.std(scores['r2']['cl_score_cl_reg']['cl_from_cl']),
             np.mean(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
             np.std(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
+        ],
+    ])
+    np.savetxt(
+        scores_csv_path,
+        csv_scores,
+        fmt='%.3f',
+        delimiter=',',
+        header='mean R2, std R2, mean %NRMSE, std %NRMSE',
+        comments='',
+    )
+
+
+def action_score_sysid_prediction(
+    experiment_path: pathlib.Path,
+    predictions_path: pathlib.Path,
+    scores_path: pathlib.Path,
+    scores_csv_path: pathlib.Path,
+):
+    """Score prediction for all test episodes."""
+    exp = joblib.load(experiment_path)
+    pred = joblib.load(predictions_path)
+    # Get shared episode feature
+    episode_feature = exp['closed_loop']['episode_feature']
+    if exp['open_loop']['episode_feature'] != episode_feature:
+        raise ValueError('Open- and closed-loop episode features differ.')
+    # Score all the scenarios
+    eps_test = pykoop.split_episodes(
+        pred['X_test']['cl'],
+        episode_feature=episode_feature,
+    )
+    eps_pred = pykoop.split_episodes(
+        pred['Xp']['cl'],
+        episode_feature=episode_feature,
+    )
+    r2_list = []
+    mse_list = []
+    nrmse_list = []
+    for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
+        r2_list.append(
+            pykoop.score_trajectory(
+                X_pred_i,
+                X_test_i[:, :X_pred_i.shape[1]],
+                regression_metric='r2',
+                episode_feature=False,
+            ))
+        mse_list.append(-1 * pykoop.score_trajectory(
+            X_pred_i,
+            X_test_i[:, :X_pred_i.shape[1]],
+            regression_metric='neg_mean_squared_error',
+            episode_feature=False,
+        ))
+        e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
+        rmse = np.sqrt(np.mean(e_i**2, axis=0))
+        ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
+        nrmse_list.append(np.mean(rmse / ampl * 100))
+    r2 = np.array(r2_list)
+    mse = np.array(mse_list)
+    nrmse = np.array(nrmse_list)
+    # Save scores
+    scores = {
+        'r2': r2,
+        'mse': mse,
+        '%nrmse': nrmse,
+    }
+    scores_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scores, scores_path)
+    # Format score array for CSV
+    csv_scores = np.block([
+        [
+            np.mean(scores['r2']),
+            np.std(scores['r2']),
+            np.mean(scores['%nrmse']),
+            np.std(scores['%nrmse']),
         ],
     ])
     np.savetxt(
@@ -1133,6 +1347,7 @@ def action_plot_paper_figures(
     experiment_path: pathlib.Path,
     cross_validation_path: pathlib.Path,
     predictions_path: pathlib.Path,
+    predictions_sysid_path: pathlib.Path,
     spectral_radii_path: pathlib.Path,
     controller_rewrap_path: pathlib.Path,
     figure_path: pathlib.Path,
@@ -1142,6 +1357,7 @@ def action_plot_paper_figures(
     exp = joblib.load(experiment_path)
     cv = joblib.load(cross_validation_path)
     pred = joblib.load(predictions_path)
+    pred_sysid = joblib.load(predictions_sysid_path)
     spect_rad = joblib.load(spectral_radii_path)
     cont_rewrap = joblib.load(controller_rewrap_path)
     # Create output directory
@@ -1160,6 +1376,7 @@ def action_plot_paper_figures(
         'new_const': OKABE_ITO['vermillion'],
         'lstsq': OKABE_ITO['blue'],
         'new_lstsq': OKABE_ITO['vermillion'],
+        'cl_arx': OKABE_ITO['yellow'],
     }
     labels = {
         'ref': 'Measured',
@@ -1173,6 +1390,7 @@ def action_plot_paper_figures(
         'new_const': 'Reconstructed',
         'lstsq': 'Identified',
         'new_lstsq': 'Reconstructed',
+        'cl_arx': 'CL ARX',
     }
     # Set test episode to plot
     test_ep = 0
@@ -1289,7 +1507,7 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes((0.42, 0.06, 0.5, 0.5), projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1432,7 +1650,7 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes((0.42, 0.06, 0.5, 0.5), projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1829,6 +2047,22 @@ def action_plot_paper_figures(
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
+        X_test_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['X_test'].items()
+        }
+        Xp_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['Xp'].items()
+        }
         t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
         fig, ax = plt.subplots(
             4,
@@ -1837,8 +2071,8 @@ def action_plot_paper_figures(
             constrained_layout=True,
             figsize=(LW, LW),
         )
-        for i, a in enumerate(ax.ravel()):
-            a.plot(
+        for i in range(ax.shape[0]):
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1847,7 +2081,7 @@ def action_plot_paper_figures(
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
             )
-            a.plot(
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1856,7 +2090,27 @@ def action_plot_paper_figures(
                 color=colors['ol_score_cl_reg'],
                 label=labels['ol_score_cl_reg'],
             )
-            a.plot(
+            if i == 2:
+                ax[i].plot(
+                    t,
+                    _percent_error(
+                        X_test_arx['cl'][:, 0],
+                        Xp_arx['cl'][:, 0],
+                    ),
+                    color=colors['cl_arx'],
+                    label=labels['cl_arx'],
+                )
+            if i == 3:
+                ax[i].plot(
+                    t,
+                    _percent_error(
+                        X_test_arx['cl'][:, 1],
+                        Xp_arx['cl'][:, 1],
+                    ),
+                    color=colors['cl_arx'],
+                    label=labels['cl_arx'],
+                )
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1865,7 +2119,7 @@ def action_plot_paper_figures(
                 color=colors['cl_score_ol_reg'],
                 label=labels['cl_score_ol_reg'],
             )
-            a.plot(
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1875,7 +2129,7 @@ def action_plot_paper_figures(
                 label=labels['cl_score_cl_reg'],
                 linestyle=':',
             )
-            a.set_ylim([-120, 120])
+            ax[i].set_ylim([-120, 120])
         ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
         ax[1].set_ylabel(r'$\Delta x_2^\mathrm{c}(t)$ (\%)')
         ax[2].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
@@ -1884,13 +2138,14 @@ def action_plot_paper_figures(
         ax[3].set_xlabel(r'$t$ (s)')
         fig.legend(
             handles=[
-                ax[0].get_lines()[0],
-                ax[0].get_lines()[2],
-                ax[0].get_lines()[1],
-                ax[0].get_lines()[3],
+                ax[2].get_lines()[0],
+                ax[2].get_lines()[3],
+                ax[2].get_lines()[1],
+                ax[2].get_lines()[4],
+                ax[2].get_lines()[2],
             ],
             loc='upper center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
             bbox_to_anchor=(0.5, 0.02),
         )
@@ -1935,6 +2190,22 @@ def action_plot_paper_figures(
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
         }
+        X_test_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['X_test'].items()
+        }
+        Xp_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['Xp'].items()
+        }
         t = np.arange(X_test['ol_from_ol'].shape[0]) * exp['t_step']
         fig, ax = plt.subplots(
             3,
@@ -1961,6 +2232,17 @@ def action_plot_paper_figures(
                 ),
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
+            )
+            # ARX diverges so quickly, only plot first few steps
+            n_step_arx = 10
+            ax[i].plot(
+                t[:n_step_arx],
+                _percent_error(
+                    X_test_arx['ol'][:n_step_arx, i],
+                    Xp_arx['ol'][:n_step_arx, i],
+                ),
+                color=colors['cl_arx'],
+                label=labels['cl_arx'],
             )
             ax[i].plot(
                 t,
@@ -1996,9 +2278,10 @@ def action_plot_paper_figures(
         fig.legend(
             handles=[
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[2],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[3],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
                 ax[2].get_lines()[0],
             ],
             loc='upper center',
@@ -2591,3 +2874,64 @@ def _percent_error(reference: np.ndarray, predicted: np.ndarray) -> np.ndarray:
     ampl = np.max(np.abs(reference))
     percent_error = (reference - predicted) / ampl * 100
     return percent_error
+
+
+def _combine_tf(
+    G: Union[np.ndarray, List[List[control.TransferFunction]]]
+) -> control.TransferFunction:
+    """Combine array-like of SISO transfer functions into a MIMO TF.
+
+    Parameters
+    ----------
+    G : Union[np.ndarray, List[List[control.TransferFunction]]]
+        Array-like of SISO transfer function objects.
+
+    Returns
+    -------
+    control.TransferFunction :
+        MIMO transfer function object.
+    """
+    G = np.array(G)
+    num = []
+    den = []
+    for i_out in range(G.shape[0]):
+        for j_out in range(G[i_out, 0].noutputs):
+            num_row = []
+            den_row = []
+            for i_in in range(G.shape[1]):
+                for j_in in range(G[i_out, i_in].ninputs):
+                    num_row.append(G[i_out, i_in].num[j_out][j_in])
+                    den_row.append(G[i_out, i_in].den[j_out][j_in])
+            num.append(num_row)
+            den.append(den_row)
+    G_tf = control.TransferFunction(num, den, dt=G[0][0].dt)
+    return G_tf
+
+
+def _split_tf(G: control.TransferFunction) -> np.ndarray:
+    """Split MIMO transfer function into array of SISO TFs.
+
+    Parameters
+    ----------
+    G : control.TranferFunction
+        MIMO transfer function object.
+
+    Returns
+    -------
+    np.ndarray
+        Array of SISO transfer function.s
+
+    """
+    G_split_lst = []
+    for i_out in range(G.noutputs):
+        row = []
+        for i_in in range(G.ninputs):
+            row.append(
+                control.TransferFunction(
+                    G.num[i_out][i_in],
+                    G.den[i_out][i_in],
+                    dt=G.dt,
+                ))
+        G_split_lst.append(row)
+    G_split = np.array(G_split_lst, dtype=object)
+    return G_split
