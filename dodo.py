@@ -2880,8 +2880,17 @@ def action_duffing(duffing_path: pathlib.Path):
         lifting_functions=lf_cl,
         regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
             alpha=0,
-            picos_eps=1e-6,
-            solver_params={'solver': 'mosek', 'dualize': False},
+            picos_eps=1e-8,
+            solver_params={
+                'solver': 'mosek',
+                'dualize': False,
+                'abs_dual_fsb_tol': 1e-9,
+                'abs_ipm_opt_tol': 1e-9,
+                'abs_prim_fsb_tol': 1e-9,
+                'rel_dual_fsb_tol': 1e-9,
+                'rel_ipm_opt_tol': 1e-9,
+                'rel_prim_fsb_tol': 1e-9,
+            },
         ),
         controller=(pid.A, pid.B, pid.C, pid.D),
         C_plant=None,
@@ -3288,7 +3297,10 @@ def _simulate_duffing(
         sos = scipy.signal.butter(12, 5, output='sos', fs=(1 / t_step))
         N = scipy.signal.sosfilt(sos, N_unfilt)
     else:
-        N = np.zeros((1, t.size, ))
+        N = np.zeros((
+            1,
+            t.size,
+        ))
     X[:, 0] = x0
     Xc[:, 0] = xc0
     # Simulate system
