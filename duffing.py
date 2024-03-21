@@ -73,13 +73,12 @@ def main():
         (
             'rbf',
             pykoop.RbfLiftingFn(
-                rbf='gaussian',
-                shape=1,
+                rbf='exponential',
+                shape=0.5,
                 centers=pykoop.QmcCenters(
-                    n_centers=32,
-                    symmetric_range=True,
+                    n_centers=20,
                     qmc=scipy.stats.qmc.LatinHypercube,
-                    random_state=234,
+                    random_state=666,
                 ),
             ),
         ),
