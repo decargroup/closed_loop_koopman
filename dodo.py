@@ -2881,7 +2881,7 @@ def action_duffing(duffing_path: pathlib.Path):
         regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
             alpha=0,
             picos_eps=1e-6,
-            solver_params={'solver': 'mosek'},
+            solver_params={'solver': 'mosek', 'dualize': False},
         ),
         controller=(pid.A, pid.B, pid.C, pid.D),
         C_plant=None,
