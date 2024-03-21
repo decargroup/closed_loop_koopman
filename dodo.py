@@ -444,9 +444,14 @@ def task_duffing():
         'duffing',
         'duffing.pickle',
     )
+    duffing_scores_path = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing_scores.csv',
+    )
     return {
-        'actions': [(action_duffing, (duffing_path, ))],
-        'targets': [duffing_path],
+        'actions': [(action_duffing, (duffing_path, duffing_scores_path))],
+        'targets': [duffing_path, duffing_scores_path],
         'clean': True,
     }
 
@@ -2802,7 +2807,10 @@ def action_plot_paper_figures(
     plt.close(fig)
 
 
-def action_duffing(duffing_path: pathlib.Path):
+def action_duffing(
+    duffing_path: pathlib.Path,
+    duffing_scores_path: pathlib.Path,
+):
     """Simulate and identify Duffing oscillator."""
     # Simulation parameters
     t_range = (0, 10)
@@ -2959,6 +2967,35 @@ def action_duffing(duffing_path: pathlib.Path):
         tf_ol_from_cl,
         U=ep_ol_test[:, 1],
     )
+    # Make results path
+    duffing_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save scores
+    csv_scores = np.block([
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_kp_ol_from_ol[:, 0]),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_kp_ol_from_ol[:, 0]),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_kp_ol_from_cl[:, 0]),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_kp_ol_from_cl[:, 0]),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_tf_ol_from_ol),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_tf_ol_from_ol),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_tf_ol_from_cl),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_tf_ol_from_cl),
+        ],
+    ])
+    np.savetxt(
+        duffing_scores_path,
+        csv_scores,
+        fmt='%.3f',
+        delimiter=',',
+        header='%ME, %NRMSE',
+        comments='',
+    )
     # Save results
     output = {
         'kp_ol': kp_ol,
@@ -2972,12 +3009,11 @@ def action_duffing(duffing_path: pathlib.Path):
         'ep_ol_test': ep_ol_test,
         'Xp_kp_cl': Xp_kp_cl,
         'Xp_tf_cl': Xp_tf_cl,
-        'Xp_kp_ol_from_ol': Xp_kp_ol_from_ol,
-        'Xp_kp_ol_from_cl': Xp_kp_ol_from_cl,
+        'Xp_kp_ol_from_ol': Xp_kp_ol_from_ol[:, 0],
+        'Xp_kp_ol_from_cl': Xp_kp_ol_from_cl[:, 0],
         'Xp_tf_ol_from_ol': Xp_tf_ol_from_ol,
         'Xp_tf_ol_from_cl': Xp_tf_ol_from_cl,
     }
-    duffing_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(output, duffing_path)
 
 
@@ -3377,3 +3413,41 @@ def _prbs(
     prbs = np.concatenate(prbs_lst)
     prbs_cut = prbs[:t.size]
     return prbs_cut
+
+
+def _percent_mean_error(true: np.ndarray, meas: np.ndarray) -> float:
+    """Percent mean error of a trajectory.
+
+    Parameters
+    ----------
+    true : np.ndarray
+        True values.
+    meas : np.ndarray
+        Measured values.
+
+    Returns
+    -------
+    float
+        Percent mean error.
+    """
+    err = np.mean(true - meas) / np.max(np.abs(true)) * 100
+    return err
+
+
+def _percent_rms_error(true: np.ndarray, meas: np.ndarray) -> float:
+    """Percent RMS error of a trajectory.
+
+    Parameters
+    ----------
+    true : np.ndarray
+        True values.
+    meas : np.ndarray
+        Measured values.
+
+    Returns
+    -------
+    float
+        Percent RMS error.
+    """
+    err = np.sqrt(np.mean((true - meas)**2)) / np.max(np.abs(true)) * 100
+    return err

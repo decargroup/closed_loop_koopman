@@ -54,8 +54,8 @@ def main():
     fig.suptitle('CL Err')
 
     fig, ax = plt.subplots(2, 1)
-    ax[0].plot(Xp_kp_ol_from_ol[:, 0], label='Koopman, OL from OL')
-    ax[0].plot(Xp_kp_ol_from_cl[:, 0], '--', label='Koopman, OL from CL')
+    ax[0].plot(Xp_kp_ol_from_ol, label='Koopman, OL from OL')
+    ax[0].plot(Xp_kp_ol_from_cl, '--', label='Koopman, OL from CL')
     ax[0].plot(Xp_tf_ol_from_ol, label='System ID, OL from OL')
     ax[0].plot(Xp_tf_ol_from_cl, '--', label='System ID, OL from CL')
     ax[0].plot(ep_ol_test[:, 0], '--k', lw=2, label='True')
@@ -67,11 +67,11 @@ def main():
 
     fig, ax = plt.subplots(2, 1)
     ax[0].plot(
-        ep_ol_test[:, 0] - Xp_kp_ol_from_ol[:, 0],
+        ep_ol_test[:, 0] - Xp_kp_ol_from_ol,
         label='Koopman, OL from OL',
     )
     ax[0].plot(
-        ep_ol_test[:, 0] - Xp_kp_ol_from_cl[:, 0],
+        ep_ol_test[:, 0] - Xp_kp_ol_from_cl,
         '--',
         label='Koopman, OL from CL',
     )
@@ -91,12 +91,12 @@ def main():
     fig.suptitle('OL Err')
 
     print('Koopman, OL from OL')
-    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_ol[:, 0]))
-    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_ol[:, 0]))
+    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_ol))
+    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_ol))
 
     print('Koopman, OL from CL')
-    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_cl[:, 0]))
-    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_cl[:, 0]))
+    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_cl))
+    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_cl))
 
     print('System ID, OL from OL')
     print(np.mean(ep_ol_test[:, 0] - Xp_tf_ol_from_ol))
