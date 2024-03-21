@@ -6,6 +6,7 @@ import control
 import numpy as np
 import pykoop
 import pykoop.dynamic_models
+import scipy.signal
 import scipy.stats
 import sippy
 from matplotlib import pyplot as plt
@@ -64,7 +65,7 @@ def main():
     # plt.show()
     # exit()
 
-    ord = 20
+    ord = 6
     lf_cl = [
         (
             'delay',
@@ -230,6 +231,22 @@ def main():
     ax[0].legend(loc='upper right')
     fig.suptitle('OL Err')
 
+    print('Koopman, OL from OL')
+    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_ol[:, 0]))
+    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_ol[:, 0]))
+
+    print('Koopman, OL from CL')
+    print(np.mean(ep_ol_test[:, 0] - Xp_kp_ol_from_cl[:, 0]))
+    print(np.std(ep_ol_test[:, 0] - Xp_kp_ol_from_cl[:, 0]))
+
+    print('System ID, OL from OL')
+    print(np.mean(ep_ol_test[:, 0] - Xp_tf_ol_from_ol))
+    print(np.std(ep_ol_test[:, 0] - Xp_tf_ol_from_ol))
+
+    print('System ID, OL from CL')
+    print(np.mean(ep_ol_test[:, 0] - Xp_tf_ol_from_cl))
+    print(np.std(ep_ol_test[:, 0] - Xp_tf_ol_from_cl))
+
     plt.show()
 
 
@@ -294,7 +311,9 @@ def simulate(
             allow_singular=True,
             seed=rng,
         )
-        N = dist.rvs(size=t.size).reshape(1, -1)
+        N_ = dist.rvs(size=t.size).reshape(1, -1)
+        sos = scipy.signal.butter(12, 5, output='sos', fs=(1 / t_step))
+        N = scipy.signal.sosfilt(sos, N_)
     else:
         N = np.zeros_like(X)
     X[:, 0] = x0
