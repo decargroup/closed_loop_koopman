@@ -3,7 +3,7 @@
 import collections
 import pathlib
 import shutil
-from typing import Any, Dict, List, Tuple, Union, Optional, Generator
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import control
 import doit
@@ -444,6 +444,11 @@ def task_duffing():
         'duffing',
         'duffing.pickle',
     )
+    return {
+        'actions': [(action_duffing, (duffing_path, ))],
+        'targets': [duffing_path],
+        'clean': True,
+    }
 
 
 def action_preprocess_experiments(
@@ -2797,6 +2802,176 @@ def action_plot_paper_figures(
     plt.close(fig)
 
 
+def action_duffing(duffing_path: pathlib.Path):
+    """Simulate and identify Duffing oscillator."""
+    # Simulation parameters
+    t_range = (0, 10)
+    t_step = 1e-2
+    t = np.arange(*t_range, t_step)
+    rng = np.random.default_rng(seed=1234)
+    covariance = np.diag([2]) * t_step
+    covariance_test = None
+    # Set controller
+    k_p = 1
+    k_i = 1
+    s = control.TransferFunction.s
+    pid_c = k_p + k_i * (1 / s)
+    pid_d = pid_c.sample(t_step)
+    pid = control.reachable_form(control.tf2ss(pid_d))[0]
+    # Generate training and test data
+    n_ep = 11
+    n_tr = n_ep - 1
+    X_ol_train, X_cl_train = _generate_duffing_episodes(
+        0,
+        n_tr,
+        t_step,
+        t_range,
+        pid,
+        covariance,
+        rng,
+    )
+    X_ol_test, X_cl_test = _generate_duffing_episodes(
+        n_tr,
+        n_ep,
+        t_step,
+        t_range,
+        pid,
+        covariance_test,
+        rng,
+    )
+    # Specify lifting functions
+    order = 6
+    lf_cl = [
+        (
+            'delay',
+            pykoop.DelayLiftingFn(order, order),
+        ),
+        (
+            'rbf',
+            pykoop.RbfLiftingFn(
+                rbf='thin_plate',
+                shape=0.2,
+                centers=pykoop.QmcCenters(
+                    n_centers=50,
+                    qmc=scipy.stats.qmc.LatinHypercube,
+                    random_state=666,
+                ),
+            ),
+        ),
+    ]
+    lf_ol = [(
+        'split',
+        pykoop.SplitPipeline(
+            lifting_functions_state=lf_cl,
+            lifting_functions_input=None,
+        ),
+    )]
+    # Fit open-loop Koopman model
+    kp_ol = pykoop.KoopmanPipeline(
+        lifting_functions=lf_ol,
+        regressor=pykoop.Edmd(),
+    ).fit(
+        X_ol_train,
+        n_inputs=1,
+        episode_feature=True,
+    )
+    # Fit closed-loop Koopman model
+    kp_cl = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lf_cl,
+        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+            alpha=0,
+            picos_eps=1e-6,
+            solver_params={'solver': 'mosek'},
+        ),
+        controller=(pid.A, pid.B, pid.C, pid.D),
+        C_plant=None,
+    ).fit(
+        X_cl_train,
+        n_inputs=1,
+        episode_feature=True,
+    )
+    # Split up episodes for system ID
+    eps_cl_train = pykoop.split_episodes(X_cl_train, episode_feature=True)
+    eps_ol_train = pykoop.split_episodes(X_ol_train, episode_feature=True)
+    ep_cl_test = pykoop.split_episodes(X_cl_test, episode_feature=True)[0][1]
+    ep_ol_test = pykoop.split_episodes(X_ol_test, episode_feature=True)[0][1]
+    # Fit closed-loop ARX model
+    num_lst = []
+    den_lst = []
+    for i, X_cl_train_i in eps_cl_train:
+        id = sippy.system_identification(
+            X_cl_train_i[:, 1],
+            X_cl_train_i[:, 2],
+            'ARX',
+            tsample=t_step,
+            ARX_orders=[order, 1, 0],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    tf_cl = control.TransferFunction(num, den, dt=t_step)
+    # Recover open-loop system
+    tf_cont = pid_d
+    tf_ol_from_cl = tf_cl / (tf_cont - (tf_cont * tf_cl))
+    # Fit open-loop ARX model
+    num_lst = []
+    den_lst = []
+    for i, X_ol_train_i in eps_ol_train:
+        id = sippy.system_identification(
+            X_ol_train_i[:, 0],
+            X_ol_train_i[:, 1],
+            'ARX',
+            tsample=t_step,
+            ARX_orders=[order, 1, 0],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    tf_ol_from_ol = control.TransferFunction(num, den, dt=t_step)
+    # Predict closed-loop trajectories
+    Xp_kp_cl = kp_cl.predict_trajectory(ep_cl_test, episode_feature=False)
+    _, Xp_tf_cl = control.forced_response(tf_cl, U=ep_cl_test[:, 1])
+    # Predict open-loop trajectories
+    Xp_kp_ol_from_ol = kp_ol.predict_trajectory(
+        ep_ol_test,
+        episode_feature=False,
+    )
+    Xp_kp_ol_from_cl = kp_cl.kp_plant_.predict_trajectory(
+        ep_ol_test,
+        episode_feature=False,
+    )
+    _, Xp_tf_ol_from_ol = control.forced_response(
+        tf_ol_from_ol,
+        U=ep_ol_test[:, 1],
+    )
+    _, Xp_tf_ol_from_cl = control.forced_response(
+        tf_ol_from_cl,
+        U=ep_ol_test[:, 1],
+    )
+    # Save results
+    output = {
+        'kp_ol': kp_ol,
+        'kp_cl': kp_cl,
+        'tf_cl': tf_cl,
+        'tf_ol_from_ol': tf_ol_from_ol,
+        'tf_ol_from_cl': tf_ol_from_cl,
+        'eps_cl_train': eps_cl_train,
+        'eps_ol_train': eps_ol_train,
+        'ep_cl_test': ep_cl_test,
+        'ep_ol_test': ep_ol_test,
+        'Xp_kp_cl': Xp_kp_cl,
+        'Xp_tf_cl': Xp_tf_cl,
+        'Xp_kp_ol_from_ol': Xp_kp_ol_from_ol,
+        'Xp_kp_ol_from_cl': Xp_kp_ol_from_cl,
+        'Xp_tf_ol_from_ol': Xp_tf_ol_from_ol,
+        'Xp_tf_ol_from_cl': Xp_tf_ol_from_cl,
+    }
+    duffing_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(output, duffing_path)
+
+
 def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
     """Compute eigenvalues from a Koopman pipeline.
 
@@ -2946,12 +3121,122 @@ def _split_tf(G: control.TransferFunction) -> np.ndarray:
     return G_split
 
 
+class _DuffingOscillator():
+    """Duffing oscillator.
+
+    ``mass * x_ddot + damping * x_dot + stiffness * x + hardening * x^3 = u``
+    """
+
+    def __init__(
+        self,
+        mass: float,
+        stiffness: float,
+        damping: float,
+        hardening: float,
+    ) -> None:
+        """Instantiate :class:`_DuffingOscillator`.
+
+        Parameters
+        ----------
+        mass : float
+            Mass; coefficient for second derivative of ``x``.
+        stiffness : float
+            Stiffness; coefficient for ``x``.
+        damping : float
+            Damping; coefficient for first derivative of ``x``.
+        hardening : float
+            Nonlinear spring stiffness; cofficient for ``x^3``.
+        """
+        self.mass = mass
+        self.stiffness = stiffness
+        self.damping = damping
+        self.hardening = hardening
+
+    def f(self, t: float, x: np.ndarray, u: np.ndarray):
+        """Implement differential equation.
+
+        Parameters
+        ----------
+        t : float
+            Time (s), unused.
+        x : np.ndarray
+            State, one-dimensional.
+        u : np.ndarray
+            Input, scalar.
+
+        Returns
+        -------
+        np.ndarray :
+            Time derivative of state.
+        """
+        x_dot = np.array([
+            x[1],
+            (-self.stiffness / self.mass * x[0]) +
+            (-self.damping / self.mass * x[1]) +
+            (-self.hardening / self.mass * x[0]**3) + (1 / self.mass * u),
+        ])
+        return x_dot
+
+
+def _generate_duffing_episodes(
+    start: int,
+    stop: int,
+    t_step: float,
+    t_range: Tuple[float, float],
+    controller: control.StateSpace,
+    covariance: Optional[np.ndarray],
+    rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate training and validation episodes for Duffing oscillator.
+
+    Parameters
+    ----------
+    start : int
+        First episode feature index.
+    stop : int
+        Last episode feature index.
+    t_step : float
+        Time step (s).
+    t_range : Tuple[float, float]
+        Start and stop times of simulation.
+    controller : control.StateSpace
+        Controller.
+    covariance : np.ndarray
+        Covariance of noise to be added to measurements.
+    rng : Optional[np.random.Generator]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray] :
+        Open-loop and closed-loop datasets.
+    """
+    eps_ol = []
+    eps_cl = []
+    for ep in range(start, stop):
+        R = _prbs(-1, 1, 0.3, 2, t_range, t_step, rng=rng).reshape((-1, 1))
+        Y, U, X, Xc = _simulate_duffing(
+            R,
+            t_step,
+            controller,
+            covariance,
+            rng=rng,
+        )
+        X_ep_ol = np.hstack([Y, U])
+        X_ep_cl = np.hstack([Xc, Y, R])
+        eps_ol.append((ep, X_ep_ol))
+        eps_cl.append((ep, X_ep_cl))
+    X_ol = pykoop.combine_episodes(eps_ol, episode_feature=True)
+    X_cl = pykoop.combine_episodes(eps_cl, episode_feature=True)
+    return X_ol, X_cl
+
+
 def _simulate_duffing(
     Rt: np.ndarray,
-    pid: control.StateSpace,
     t_step: float,
-    covariance: np.ndarray,
-    rng: Optional[np.random.RandomState] = None,
+    controller: control.StateSpace,
+    covariance: Optional[np.ndarray],
+    rng: Optional[np.random.Generator] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Simulate one episode of a Duffing oscillator.
 
@@ -2959,31 +3244,37 @@ def _simulate_duffing(
     ----------
     Rt : np.ndarray
         Reference signal, where time is the first axis.
-    pid : control.StateSpace
-        Controller.
     t_step : float
         Time step (s).
+    controller : control.StateSpace
+        Controller.
     covariance : np.ndarray
         Covariance of noise to be added to measurements.
-    rng : Optional[np.random.RandomState]
+    rng : Optional[np.random.Generator]
         Random number generator to set seed for noise.
 
     Returns
     -------
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] :
-        Plant output, input, and state, along with controller state.
+        Plant output, input, and state, along with controller state. For each,
+        time is the first axis.
     """
     if rng is None:
         rng = np.random.default_rng()
     # Simulation parameters
     t_range = (0, Rt.shape[0] * t_step)
-    duff = pykoop.dynamic_models.DuffingOscillator()
+    duff = _DuffingOscillator(
+        mass=0.01,
+        stiffness=0.02,
+        damping=0.1,
+        hardening=0.4,
+    )
     # Initial conditions
     x0 = np.array([0, 0])
-    xc0 = np.array([0, 0])
+    xc0 = np.zeros((controller.nstates, ))
     t = np.arange(*t_range, t_step)
     X = np.zeros((2, t.size))
-    Xc = np.zeros((2, t.size))
+    Xc = np.zeros((controller.nstates, t.size))
     Y = np.zeros((1, t.size))
     U = np.zeros((1, t.size))
     if covariance is not None:
@@ -2993,29 +3284,30 @@ def _simulate_duffing(
             allow_singular=True,
             seed=rng,
         )
-        N = dist.rvs(size=t.size).reshape(1, -1)
+        N_unfilt = dist.rvs(size=t.size).reshape(1, -1)
+        sos = scipy.signal.butter(12, 5, output='sos', fs=(1 / t_step))
+        N = scipy.signal.sosfilt(sos, N_unfilt)
     else:
-        N = np.zeros_like(X)
+        N = np.zeros((1, t.size, ))
     X[:, 0] = x0
     Xc[:, 0] = xc0
-    Y[:, 0] = x0[[0]] + N[:, 0]
     # Simulate system
     for k in range(1, t.size + 1):
+        Y[:, k - 1] = X[0, k - 1] + N[:, k - 1]
         e = Rt.T[:, [k - 1]] - Y[:, [k - 1]]
         # Compute controller output
-        U[:, [k - 1]] = pid.C @ Xc[:, [k - 1]] + pid.D @ e
+        U[:, [k - 1]] = controller.C @ Xc[:, [k - 1]] + controller.D @ e
         # Don't update controller and plant past last time step
         if k >= Xc.shape[1]:
             break
         # Update controller
-        Xc[:, [k]] = pid.A @ Xc[:, [k - 1]] + pid.B @ e
+        Xc[:, [k]] = controller.A @ Xc[:, [k - 1]] + controller.B @ e
         # Update plant
         X[:, k] = X[:, k - 1] + t_step * duff.f(
             t[k - 1],
             X[:, k - 1],
             U[0, k - 1],
         )
-        Y[:, k] = X[[0], k] + N[:, k]
     return Y.T, U.T, X.T, Xc.T
 
 
@@ -3026,7 +3318,7 @@ def _prbs(
     max_dt: float,
     t_range: Tuple[float, float],
     t_step: float,
-    rng: Optional[np.random.RandomState] = None,
+    rng: Optional[np.random.Generator] = None,
 ) -> np.ndarray:
     """Pseudorandom binary sequence.
 
@@ -3044,7 +3336,7 @@ def _prbs(
         Start and stop times (s).
     t_step : float
         Time step (s).
-    rng : Optional[np.random.RandomState]
+    rng : Optional[np.random.Generator]
         Random number generator to set seed for noise.
 
     Returns
