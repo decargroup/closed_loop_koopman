@@ -74,8 +74,8 @@ def main():
         (
             'rbf',
             pykoop.RbfLiftingFn(
-                rbf='exponential',
-                shape=1,
+                rbf='thin_plate',
+                shape=0.5,
                 centers=pykoop.QmcCenters(
                     n_centers=50,
                     qmc=scipy.stats.qmc.LatinHypercube,
