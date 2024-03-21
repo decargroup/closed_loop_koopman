@@ -3,7 +3,7 @@
 import collections
 import pathlib
 import shutil
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union, Optional, Generator
 
 import control
 import doit
@@ -435,6 +435,15 @@ def task_plot_paper_figures():
             'clean':
             True,
         }
+
+
+def task_duffing():
+    """Simulate and identify Duffing oscillator."""
+    duffing_path = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing.pickle',
+    )
 
 
 def action_preprocess_experiments(
@@ -2935,3 +2944,132 @@ def _split_tf(G: control.TransferFunction) -> np.ndarray:
         G_split_lst.append(row)
     G_split = np.array(G_split_lst, dtype=object)
     return G_split
+
+
+def _simulate_duffing(
+    Rt: np.ndarray,
+    pid: control.StateSpace,
+    t_step: float,
+    covariance: np.ndarray,
+    rng: Optional[np.random.RandomState] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Simulate one episode of a Duffing oscillator.
+
+    Parameters
+    ----------
+    Rt : np.ndarray
+        Reference signal, where time is the first axis.
+    pid : control.StateSpace
+        Controller.
+    t_step : float
+        Time step (s).
+    covariance : np.ndarray
+        Covariance of noise to be added to measurements.
+    rng : Optional[np.random.RandomState]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] :
+        Plant output, input, and state, along with controller state.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    # Simulation parameters
+    t_range = (0, Rt.shape[0] * t_step)
+    duff = pykoop.dynamic_models.DuffingOscillator()
+    # Initial conditions
+    x0 = np.array([0, 0])
+    xc0 = np.array([0, 0])
+    t = np.arange(*t_range, t_step)
+    X = np.zeros((2, t.size))
+    Xc = np.zeros((2, t.size))
+    Y = np.zeros((1, t.size))
+    U = np.zeros((1, t.size))
+    if covariance is not None:
+        dist = scipy.stats.multivariate_normal(
+            mean=np.zeros((1, )),
+            cov=covariance,
+            allow_singular=True,
+            seed=rng,
+        )
+        N = dist.rvs(size=t.size).reshape(1, -1)
+    else:
+        N = np.zeros_like(X)
+    X[:, 0] = x0
+    Xc[:, 0] = xc0
+    Y[:, 0] = x0[[0]] + N[:, 0]
+    # Simulate system
+    for k in range(1, t.size + 1):
+        e = Rt.T[:, [k - 1]] - Y[:, [k - 1]]
+        # Compute controller output
+        U[:, [k - 1]] = pid.C @ Xc[:, [k - 1]] + pid.D @ e
+        # Don't update controller and plant past last time step
+        if k >= Xc.shape[1]:
+            break
+        # Update controller
+        Xc[:, [k]] = pid.A @ Xc[:, [k - 1]] + pid.B @ e
+        # Update plant
+        X[:, k] = X[:, k - 1] + t_step * duff.f(
+            t[k - 1],
+            X[:, k - 1],
+            U[0, k - 1],
+        )
+        Y[:, k] = X[[0], k] + N[:, k]
+    return Y.T, U.T, X.T, Xc.T
+
+
+def _prbs(
+    min_y: float,
+    max_y: float,
+    min_dt: float,
+    max_dt: float,
+    t_range: Tuple[float, float],
+    t_step: float,
+    rng: Optional[np.random.RandomState] = None,
+) -> np.ndarray:
+    """Pseudorandom binary sequence.
+
+    Parameters
+    ----------
+    min_y : float
+        Minimum value.
+    max_y : float
+        Maximum value.
+    min_dt : float
+        Minimum step length (s).
+    max_dt : float
+        Maximum step length (s).
+    t_range : Tuple[float, float]
+        Start and stop times (s).
+    t_step : float
+        Time step (s).
+    rng : Optional[np.random.RandomState]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    np.ndarray :
+        Pseudorandom binary sequence.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    # Compute time array
+    t = np.arange(*t_range, t_step)
+    # Convert times into steps
+    min_steps = min_dt // t_step
+    max_steps = max_dt // t_step
+    # Generate enough step intervals for the worst case, where all
+    # ``dt = min_dt``. But we will not use all of them. This approach avoids
+    # using a loop to generate the steps.
+    worst_case_steps = int(t.size // min_steps)
+    steps = np.array(rng.integers(min_steps, max_steps, worst_case_steps))
+    start_high = rng.choice([True, False])
+    # Convert steps to binary sequence
+    prbs_lst = []
+    for i in range(steps.size):
+        amplitude = max_y if ((i % 2 == 0) == start_high) else min_y
+        prbs_lst.append(amplitude * np.ones((steps[i], )))
+    prbs = np.concatenate(prbs_lst)
+    prbs_cut = prbs[:t.size]
+    return prbs_cut
