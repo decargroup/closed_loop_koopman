@@ -1082,36 +1082,41 @@ def action_score_prediction(
     mse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     nrmse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     for x_score_y_reg in pred['Xp'].keys():
-        for x_from_y in pred['Xp'][x_score_y_reg].keys():
-            eps_test = pykoop.split_episodes(
-                pred['X_test'][x_from_y],
-                episode_feature=episode_feature,
-            )
-            eps_pred = pykoop.split_episodes(
-                pred['Xp'][x_score_y_reg][x_from_y],
-                episode_feature=episode_feature,
-            )
-            r2_list = []
-            mse_list = []
-            nrmse_list = []
-            for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
-                r2_list.append(
-                    pykoop.score_trajectory(
-                        X_pred_i,
-                        X_test_i[:, :X_pred_i.shape[1]],
-                        regression_metric='r2',
-                        episode_feature=False,
-                    ))
-                mse_list.append(-1 * pykoop.score_trajectory(
-                    X_pred_i,
-                    X_test_i[:, :X_pred_i.shape[1]],
-                    regression_metric='neg_mean_squared_error',
+        # Get closed-loop episode
+        if 'cl_from_cl' in pred['Xp'][x_score_y_reg].keys():
+            x_from_y = 'cl_from_cl'
+        else:
+            x_from_y = 'cl_from_ol'
+        # Score episode
+        eps_test = pykoop.split_episodes(
+            pred['X_test'][x_from_y],
+            episode_feature=episode_feature,
+        )
+        eps_pred = pykoop.split_episodes(
+            pred['Xp'][x_score_y_reg][x_from_y],
+            episode_feature=episode_feature,
+        )
+        r2_list = []
+        mse_list = []
+        nrmse_list = []
+        for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
+            r2_list.append(
+                pykoop.score_trajectory(
+                    X_pred_i[:, 2:],  # Ignore controller states when scoring
+                    X_test_i[:, 2:4],
+                    regression_metric='r2',
                     episode_feature=False,
                 ))
-                e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
-                rmse = np.sqrt(np.mean(e_i**2, axis=0))
-                ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
-                nrmse_list.append(np.mean(rmse / ampl * 100))
+            mse_list.append(-1 * pykoop.score_trajectory(
+                X_pred_i[:, 2:],
+                X_test_i[:, 2:4],
+                regression_metric='neg_mean_squared_error',
+                episode_feature=False,
+            ))
+            e_i = X_test_i[:, 2:4] - X_pred_i[:, 2:]
+            rmse = np.sqrt(np.mean(e_i**2, axis=0))
+            ampl = np.max(np.abs(X_test_i[:, 2:4]), axis=0)
+            nrmse_list.append(np.mean(rmse / ampl * 100))
             r2[x_score_y_reg][x_from_y] = np.array(r2_list)
             mse[x_score_y_reg][x_from_y] = np.array(mse_list)
             nrmse[x_score_y_reg][x_from_y] = np.array(nrmse_list)
