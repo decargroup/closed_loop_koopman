@@ -367,6 +367,11 @@ def task_plot_paper_figures():
         'controller_rewrap',
         'controller_rewrap.pickle',
     )
+    duffing = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing.pickle',
+    )
     figures = [
         WD.joinpath('build', 'paper_figures', 'spectral_radius_cl.pdf'),
         WD.joinpath('build', 'paper_figures', 'spectral_radius_ol.pdf'),
@@ -409,6 +414,31 @@ def task_plot_paper_figures():
             'paper_figures',
             'controller_rewrap_error_const.pdf',
         ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_train.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_traj_cl.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_traj_ol.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_err_cl.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_err_ol.pdf',
+        ),
     ]
     for figure in figures:
         yield {
@@ -421,6 +451,7 @@ def task_plot_paper_figures():
                 predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
+                duffing,
                 figure,
             ))],
             'file_dep': [
@@ -430,6 +461,7 @@ def task_plot_paper_figures():
                 predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
+                duffing,
             ],
             'targets': [figure],
             'clean':
@@ -452,6 +484,7 @@ def task_duffing():
     return {
         'actions': [(action_duffing, (duffing_path, duffing_scores_path))],
         'targets': [duffing_path, duffing_scores_path],
+        'uptodate': [doit.tools.check_timestamp_unchanged(str(duffing_path))],
         'clean': True,
     }
 
@@ -1369,6 +1402,7 @@ def action_plot_paper_figures(
     predictions_sysid_path: pathlib.Path,
     spectral_radii_path: pathlib.Path,
     controller_rewrap_path: pathlib.Path,
+    duffing_path: pathlib.Path,
     figure_path: pathlib.Path,
 ):
     """Plot paper figures."""
@@ -1379,6 +1413,7 @@ def action_plot_paper_figures(
     pred_sysid = joblib.load(predictions_sysid_path)
     spect_rad = joblib.load(spectral_radii_path)
     cont_rewrap = joblib.load(controller_rewrap_path)
+    duffing = joblib.load(duffing_path)
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     # Set colors
@@ -2800,6 +2835,138 @@ def action_plot_paper_figures(
             handlelength=1,
             bbox_to_anchor=(0.5, 0.02),
         )
+    elif figure_path.stem == 'duffing_train':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        ep_cl_train = duffing['eps_cl_train'][0][1]
+        t = np.arange(ep_cl_train.shape[0]) * duffing['t_step']
+        ax[0].plot(t, ep_cl_train[:, 1], color=colors['ref'])
+        ax[1].plot(t, ep_cl_train[:, 2], color=colors['ref'])
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[0].set_yticks([-1, -0.5, 0, 0.5, 1])
+        ax[1].set_yticks([-1, -0.5, 0, 0.5, 1])
+        ax[0].set_ylim([-1.4, 1.4])
+        ax[1].set_ylim([-1.4, 1.4])
+        ax[1].set_ylabel(r'$r(t)$ (N)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+    elif figure_path.stem == 'duffing_traj_cl':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(t, duffing['Xp_kp_cl'][:, 1], label='Koopman')
+        ax[0].plot(t, duffing['Xp_tf_cl'], label='System ID')
+        ax[0].plot(t, duffing['ep_cl_test'][:, 1], '--k', lw=2, label='True')
+        ax[1].plot(t, duffing['ep_cl_test'][:, 2], '--k', lw=2, label='True')
+    elif figure_path.stem == 'duffing_traj_ol':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(t, duffing['Xp_kp_ol_from_ol'], label='Koopman, OL from OL')
+        ax[0].plot(t,
+                   duffing['Xp_kp_ol_from_cl'],
+                   '--',
+                   label='Koopman, OL from CL')
+        ax[0].plot(t,
+                   duffing['Xp_tf_ol_from_ol'],
+                   label='System ID, OL from OL')
+        ax[0].plot(t,
+                   duffing['Xp_tf_ol_from_cl'],
+                   '--',
+                   label='System ID, OL from CL')
+        ax[0].plot(t, duffing['ep_ol_test'][:, 0], '--k', lw=2, label='True')
+        ax[1].plot(t, duffing['ep_ol_test'][:, 1], '--k', lw=2, label='True')
+    elif figure_path.stem == 'duffing_err_cl':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_cl_test'][:, 1],
+                duffing['Xp_kp_cl'][:, 1],
+            ),
+            label='Koopman',
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_cl_test'][:, 1],
+                duffing['Xp_tf_cl'],
+            ),
+            label='System ID',
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_cl_test'][:, 2],
+            '--k',
+            lw=2,
+            label='True',
+        )
+    elif figure_path.stem == 'duffing_err_ol':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_ol'],
+            ),
+            label='Koopman, OL from OL',
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_cl'],
+            ),
+            '--',
+            label='Koopman, OL from CL',
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_tf_ol_from_ol'],
+            ),
+            label='System ID, OL from OL',
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_tf_ol_from_cl'],
+            ),
+            '--',
+            label='System ID, OL from CL',
+        )
+        ax[1].plot(t, duffing['ep_ol_test'][:, 1], '--k', lw=2, label='True')
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
@@ -2998,6 +3165,9 @@ def action_duffing(
     )
     # Save results
     output = {
+        't_step': t_step,
+        'n_inputs': 1,
+        'episode_feature': True,
         'kp_ol': kp_ol,
         'kp_cl': kp_cl,
         'tf_cl': tf_cl,
