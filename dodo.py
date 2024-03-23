@@ -1435,7 +1435,10 @@ def action_plot_paper_figures(
         'new_const': OKABE_ITO['vermillion'],
         'lstsq': OKABE_ITO['blue'],
         'new_lstsq': OKABE_ITO['vermillion'],
-        'cl_arx': OKABE_ITO['yellow'],
+        'duff_cl_kp': OKABE_ITO['blue'],
+        'duff_ol_kp': OKABE_ITO['sky blue'],
+        'duff_cl_arx': OKABE_ITO['vermillion'],
+        'duff_ol_arx': OKABE_ITO['orange'],
     }
     labels = {
         'ref': 'Measured',
@@ -1449,7 +1452,10 @@ def action_plot_paper_figures(
         'new_const': 'Reconstructed',
         'lstsq': 'Identified',
         'new_lstsq': 'Reconstructed',
-        'cl_arx': 'CL ARX',
+        'duff_cl_kp': 'CL EDMD',
+        'duff_ol_kp': 'EDMD',
+        'duff_cl_arx': 'CL ARX',
+        'duff_ol_arx': 'ARX',
     }
     # Set test episode to plot
     test_ep = 0
@@ -2857,7 +2863,7 @@ def action_plot_paper_figures(
         ax[1].set_yticks([-1, -0.5, 0, 0.5, 1])
         ax[0].set_ylim([-1.4, 1.4])
         ax[1].set_ylim([-1.4, 1.4])
-        ax[1].set_ylabel(r'$r(t)$ (N)')
+        ax[1].set_ylabel(r'$r(t)$ (m)')
         ax[1].set_xlabel(r'$t$ (s)')
         fig.align_ylabels()
     elif figure_path.stem == 'duffing_traj_cl':
@@ -2869,10 +2875,46 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
-        ax[0].plot(t, duffing['Xp_kp_cl'][:, 1], label='Koopman')
-        ax[0].plot(t, duffing['Xp_tf_cl'], label='System ID')
-        ax[0].plot(t, duffing['ep_cl_test'][:, 1], '--k', lw=2, label='True')
-        ax[1].plot(t, duffing['ep_cl_test'][:, 2], '--k', lw=2, label='True')
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_cl'][:, 1],
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_cl'],
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['ep_cl_test'][:, 1],
+            '--',
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_cl_test'][:, 2],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[1].set_ylabel(r'$r(t)$ (m)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
     elif figure_path.stem == 'duffing_traj_ol':
         fig, ax = plt.subplots(
             2,
@@ -2882,20 +2924,61 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
-        ax[0].plot(t, duffing['Xp_kp_ol_from_ol'], label='Koopman, OL from OL')
-        ax[0].plot(t,
-                   duffing['Xp_kp_ol_from_cl'],
-                   '--',
-                   label='Koopman, OL from CL')
-        ax[0].plot(t,
-                   duffing['Xp_tf_ol_from_ol'],
-                   label='System ID, OL from OL')
-        ax[0].plot(t,
-                   duffing['Xp_tf_ol_from_cl'],
-                   '--',
-                   label='System ID, OL from CL')
-        ax[0].plot(t, duffing['ep_ol_test'][:, 0], '--k', lw=2, label='True')
-        ax[1].plot(t, duffing['ep_ol_test'][:, 1], '--k', lw=2, label='True')
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_ol_from_ol'],
+            color=colors['duff_ol_kp'],
+            label=labels['duff_ol_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_ol_from_cl'],
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_ol_from_ol'],
+            color=colors['duff_ol_arx'],
+            label=labels['duff_ol_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_ol_from_cl'],
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['ep_ol_test'][:, 0],
+            '--',
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_ol_test'][:, 1],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[1].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (N)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[1].set_yticks([-2, -1, 0, 1, 2])
+        ax[1].set_ylim([-2.2, 2.2])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
     elif figure_path.stem == 'duffing_err_cl':
         fig, ax = plt.subplots(
             2,
@@ -2909,24 +2992,40 @@ def action_plot_paper_figures(
             t,
             _percent_error(
                 duffing['ep_cl_test'][:, 1],
-                duffing['Xp_kp_cl'][:, 1],
+                duffing['Xp_tf_cl'],
             ),
-            label='Koopman',
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
         )
         ax[0].plot(
             t,
             _percent_error(
                 duffing['ep_cl_test'][:, 1],
-                duffing['Xp_tf_cl'],
+                duffing['Xp_kp_cl'][:, 1],
             ),
-            label='System ID',
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
         )
         ax[1].plot(
             t,
             duffing['ep_cl_test'][:, 2],
-            '--k',
-            lw=2,
-            label='True',
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$\Delta x(t)$ (\%)')
+        ax[1].set_ylabel(r'$r(t)$ (m)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[0].set_ylim([-110, 110])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'duffing_err_ol':
         fig, ax = plt.subplots(
@@ -2941,26 +3040,10 @@ def action_plot_paper_figures(
             t,
             _percent_error(
                 duffing['ep_ol_test'][:, 0],
-                duffing['Xp_kp_ol_from_ol'],
-            ),
-            label='Koopman, OL from OL',
-        )
-        ax[0].plot(
-            t,
-            _percent_error(
-                duffing['ep_ol_test'][:, 0],
-                duffing['Xp_kp_ol_from_cl'],
-            ),
-            '--',
-            label='Koopman, OL from CL',
-        )
-        ax[0].plot(
-            t,
-            _percent_error(
-                duffing['ep_ol_test'][:, 0],
                 duffing['Xp_tf_ol_from_ol'],
             ),
-            label='System ID, OL from OL',
+            color=colors['duff_ol_arx'],
+            label=labels['duff_ol_arx'],
         )
         ax[0].plot(
             t,
@@ -2968,10 +3051,50 @@ def action_plot_paper_figures(
                 duffing['ep_ol_test'][:, 0],
                 duffing['Xp_tf_ol_from_cl'],
             ),
-            '--',
-            label='System ID, OL from CL',
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
         )
-        ax[1].plot(t, duffing['ep_ol_test'][:, 1], '--k', lw=2, label='True')
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_ol'],
+            ),
+            color=colors['duff_ol_kp'],
+            label=labels['duff_ol_kp'],
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_cl'],
+            ),
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_ol_test'][:, 1],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$\Delta x(t)$ (\%)')
+        ax[1].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (N)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[0].set_ylim([-50, 50])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[3],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
