@@ -3,7 +3,7 @@
 import collections
 import pathlib
 import shutil
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import control
 import doit
@@ -11,6 +11,7 @@ import joblib
 import numpy as np
 import pykoop
 import scipy.linalg
+import sippy
 import sklearn.model_selection
 import tomli
 from matplotlib import pyplot as plt
@@ -81,7 +82,7 @@ def task_preprocess_experiments():
 
 def task_plot_experiments():
     """Plot pickled data."""
-    datasets = ['training_controller', 'test_controller']
+    datasets = ['training_controller']
     for name in datasets:
         experiment = WD.joinpath(
             'build',
@@ -179,6 +180,29 @@ def task_run_prediction():
     }
 
 
+def task_run_sysid_prediction():
+    """Run system ID prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
+    return {
+        'actions': [(action_run_sysid_prediction, (
+            experiment,
+            predictions,
+        ))],
+        'file_dep': [experiment],
+        'targets': [predictions],
+        'clean': True,
+    }
+
+
 def task_score_prediction():
     """Score prediction for all test episodes."""
     experiment = WD.joinpath(
@@ -203,6 +227,42 @@ def task_score_prediction():
     )
     return {
         'actions': [(action_score_prediction, (
+            experiment,
+            predictions,
+            scores_pickle,
+            scores_csv,
+        ))],
+        'file_dep': [experiment, predictions],
+        'targets': [scores_pickle, scores_csv],
+        'clean':
+        True,
+    }
+
+
+def task_score_sysid_prediction():
+    """Score system ID prediction for all test episodes."""
+    experiment = WD.joinpath(
+        'build',
+        'experiments',
+        'training_controller.pickle',
+    )
+    predictions = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
+    scores_pickle = WD.joinpath(
+        'build',
+        'scores_sysid',
+        'scores_sysid.pickle',
+    )
+    scores_csv = WD.joinpath(
+        'build',
+        'scores_sysid',
+        'scores_sysid.csv',
+    )
+    return {
+        'actions': [(action_score_sysid_prediction, (
             experiment,
             predictions,
             scores_pickle,
@@ -292,6 +352,11 @@ def task_plot_paper_figures():
         'predictions',
         'predictions.pickle',
     )
+    predictions_sysid = WD.joinpath(
+        'build',
+        'predictions_sysid',
+        'predictions_sysid.pickle',
+    )
     spectral_radii = WD.joinpath(
         'build',
         'spectral_radii',
@@ -301,6 +366,11 @@ def task_plot_paper_figures():
         'build',
         'controller_rewrap',
         'controller_rewrap.pickle',
+    )
+    duffing = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing.pickle',
     )
     figures = [
         WD.joinpath('build', 'paper_figures', 'spectral_radius_cl.pdf'),
@@ -344,6 +414,31 @@ def task_plot_paper_figures():
             'paper_figures',
             'controller_rewrap_error_const.pdf',
         ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_train.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_traj_cl.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_traj_ol.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_err_cl.pdf',
+        ),
+        WD.joinpath(
+            'build',
+            'paper_figures',
+            'duffing_err_ol.pdf',
+        ),
     ]
     for figure in figures:
         yield {
@@ -353,21 +448,45 @@ def task_plot_paper_figures():
                 experiment,
                 cross_validation,
                 predictions,
+                predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
+                duffing,
                 figure,
             ))],
             'file_dep': [
                 experiment,
                 cross_validation,
                 predictions,
+                predictions_sysid,
                 spectral_radii,
                 controller_rewrap,
+                duffing,
             ],
             'targets': [figure],
             'clean':
             True,
         }
+
+
+def task_duffing():
+    """Simulate and identify Duffing oscillator."""
+    duffing_path = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing.pickle',
+    )
+    duffing_scores_path = WD.joinpath(
+        'build',
+        'duffing',
+        'duffing_scores.csv',
+    )
+    return {
+        'actions': [(action_duffing, (duffing_path, duffing_scores_path))],
+        'targets': [duffing_path, duffing_scores_path],
+        'uptodate': [doit.tools.check_timestamp_unchanged(str(duffing_path))],
+        'clean': True,
+    }
 
 
 def action_preprocess_experiments(
@@ -871,6 +990,80 @@ def action_run_prediction(
     joblib.dump(predictions, predictions_path)
 
 
+def action_run_sysid_prediction(
+    experiment_path: pathlib.Path,
+    sysid_predictions_path: pathlib.Path,
+):
+    """Run system ID prediction for all test episodes."""
+    # Load dependencies
+    exp = joblib.load(experiment_path)
+    # Load training and test data
+    X_train_cl = exp['closed_loop']['X_train'][:, (0, 3, 4, 5, 6, 7)]
+    X_test_cl = exp['closed_loop']['X_test'][:, (0, 3, 4, 5, 6, 7)]
+    X_test_ol = exp['open_loop']['X_test']
+    X_test = {
+        'cl': X_test_cl,
+        'ol': X_test_ol,
+    }
+    eps_train = pykoop.split_episodes(X_train_cl, episode_feature=True)
+    eps_test_cl = pykoop.split_episodes(X_test_cl, episode_feature=True)
+    eps_test_ol = pykoop.split_episodes(X_test_ol, episode_feature=True)
+    # Transfer function order
+    order = 10
+    # Fit transfer matrix for each episode, then average coefficients
+    num_lst = []
+    den_lst = []
+    for _, ep_train in eps_train:
+        id = sippy.system_identification(
+            ep_train[:, :2].T,
+            ep_train[:, 2:].T,
+            'ARX',
+            tsample=exp['t_step'],
+            ARX_orders=[
+                [order, order],
+                [[order, order, order], [order, order, order]],
+                [[0, 0, 0], [0, 0, 0]],
+            ],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    G_cl = control.TransferFunction(num, den, dt=exp['t_step'])
+    # Controller transfer function
+    K = control.ss2tf(
+        control.StateSpace(
+            *exp['closed_loop']['controller'],
+            dt=exp['t_step'],
+        ))
+    # Extract block of CL transfer matrix corresponding to feedforward input
+    G_cl_1 = _combine_tf(_split_tf(G_cl)[:, :1])
+    # Use controller and first block of CL transfer matrix to recover plant TF
+    G_ol = G_cl_1 * (1 - K * G_cl_1)**-1
+    # Run predictions for each episode
+    eps_pred_cl = []
+    for i, ep_test_cl in eps_test_cl:
+        _, Xp_i = control.forced_response(G_cl, U=ep_test_cl[:, 2:].T)
+        eps_pred_cl.append((i, Xp_i.T))
+    eps_pred_ol = []
+    for i, ep_test_ol in eps_test_ol:
+        _, Xp_i = control.forced_response(G_ol, U=ep_test_ol[:, 2:].T)
+        eps_pred_ol.append((i, Xp_i.T))
+    Xp = {
+        'cl': pykoop.combine_episodes(eps_pred_cl, episode_feature=True),
+        'ol': pykoop.combine_episodes(eps_pred_ol, episode_feature=True),
+    }
+    # Save predictions
+    sysid_predictions = {
+        'G_cl': G_cl,
+        'G_ol': G_ol,
+        'Xp': Xp,
+        'X_test': X_test,
+    }
+    sysid_predictions_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(sysid_predictions, sysid_predictions_path)
+
+
 def action_score_prediction(
     experiment_path: pathlib.Path,
     predictions_path: pathlib.Path,
@@ -889,36 +1082,41 @@ def action_score_prediction(
     mse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     nrmse: Dict[str, Dict[str, np.ndarray]] = collections.defaultdict(dict)
     for x_score_y_reg in pred['Xp'].keys():
-        for x_from_y in pred['Xp'][x_score_y_reg].keys():
-            eps_test = pykoop.split_episodes(
-                pred['X_test'][x_from_y],
-                episode_feature=episode_feature,
-            )
-            eps_pred = pykoop.split_episodes(
-                pred['Xp'][x_score_y_reg][x_from_y],
-                episode_feature=episode_feature,
-            )
-            r2_list = []
-            mse_list = []
-            nrmse_list = []
-            for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
-                r2_list.append(
-                    pykoop.score_trajectory(
-                        X_pred_i,
-                        X_test_i[:, :X_pred_i.shape[1]],
-                        regression_metric='r2',
-                        episode_feature=False,
-                    ))
-                mse_list.append(-1 * pykoop.score_trajectory(
-                    X_pred_i,
-                    X_test_i[:, :X_pred_i.shape[1]],
-                    regression_metric='neg_mean_squared_error',
+        # Get closed-loop episode
+        if 'cl_from_cl' in pred['Xp'][x_score_y_reg].keys():
+            x_from_y = 'cl_from_cl'
+        else:
+            x_from_y = 'cl_from_ol'
+        # Score episode
+        eps_test = pykoop.split_episodes(
+            pred['X_test'][x_from_y],
+            episode_feature=episode_feature,
+        )
+        eps_pred = pykoop.split_episodes(
+            pred['Xp'][x_score_y_reg][x_from_y],
+            episode_feature=episode_feature,
+        )
+        r2_list = []
+        mse_list = []
+        nrmse_list = []
+        for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
+            r2_list.append(
+                pykoop.score_trajectory(
+                    X_pred_i[:, 2:],  # Ignore controller states when scoring
+                    X_test_i[:, 2:4],
+                    regression_metric='r2',
                     episode_feature=False,
                 ))
-                e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
-                rmse = np.sqrt(np.mean(e_i**2, axis=0))
-                ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
-                nrmse_list.append(np.mean(rmse / ampl * 100))
+            mse_list.append(-1 * pykoop.score_trajectory(
+                X_pred_i[:, 2:],
+                X_test_i[:, 2:4],
+                regression_metric='neg_mean_squared_error',
+                episode_feature=False,
+            ))
+            e_i = X_test_i[:, 2:4] - X_pred_i[:, 2:]
+            rmse = np.sqrt(np.mean(e_i**2, axis=0))
+            ampl = np.max(np.abs(X_test_i[:, 2:4]), axis=0)
+            nrmse_list.append(np.mean(rmse / ampl * 100))
             r2[x_score_y_reg][x_from_y] = np.array(r2_list)
             mse[x_score_y_reg][x_from_y] = np.array(mse_list)
             nrmse[x_score_y_reg][x_from_y] = np.array(nrmse_list)
@@ -955,6 +1153,79 @@ def action_score_prediction(
             np.std(scores['r2']['cl_score_cl_reg']['cl_from_cl']),
             np.mean(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
             np.std(scores['%nrmse']['cl_score_cl_reg']['cl_from_cl']),
+        ],
+    ])
+    np.savetxt(
+        scores_csv_path,
+        csv_scores,
+        fmt='%.3f',
+        delimiter=',',
+        header='mean R2, std R2, mean %NRMSE, std %NRMSE',
+        comments='',
+    )
+
+
+def action_score_sysid_prediction(
+    experiment_path: pathlib.Path,
+    predictions_path: pathlib.Path,
+    scores_path: pathlib.Path,
+    scores_csv_path: pathlib.Path,
+):
+    """Score prediction for all test episodes."""
+    exp = joblib.load(experiment_path)
+    pred = joblib.load(predictions_path)
+    # Get shared episode feature
+    episode_feature = exp['closed_loop']['episode_feature']
+    if exp['open_loop']['episode_feature'] != episode_feature:
+        raise ValueError('Open- and closed-loop episode features differ.')
+    # Score all the scenarios
+    eps_test = pykoop.split_episodes(
+        pred['X_test']['cl'],
+        episode_feature=episode_feature,
+    )
+    eps_pred = pykoop.split_episodes(
+        pred['Xp']['cl'],
+        episode_feature=episode_feature,
+    )
+    r2_list = []
+    mse_list = []
+    nrmse_list = []
+    for ((i, X_test_i), (_, X_pred_i)) in zip(eps_test, eps_pred):
+        r2_list.append(
+            pykoop.score_trajectory(
+                X_pred_i,
+                X_test_i[:, :X_pred_i.shape[1]],
+                regression_metric='r2',
+                episode_feature=False,
+            ))
+        mse_list.append(-1 * pykoop.score_trajectory(
+            X_pred_i,
+            X_test_i[:, :X_pred_i.shape[1]],
+            regression_metric='neg_mean_squared_error',
+            episode_feature=False,
+        ))
+        e_i = X_test_i[:, :X_pred_i.shape[1]] - X_pred_i
+        rmse = np.sqrt(np.mean(e_i**2, axis=0))
+        ampl = np.max(np.abs(X_test_i[:, :X_pred_i.shape[1]]), axis=0)
+        nrmse_list.append(np.mean(rmse / ampl * 100))
+    r2 = np.array(r2_list)
+    mse = np.array(mse_list)
+    nrmse = np.array(nrmse_list)
+    # Save scores
+    scores = {
+        'r2': r2,
+        'mse': mse,
+        '%nrmse': nrmse,
+    }
+    scores_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scores, scores_path)
+    # Format score array for CSV
+    csv_scores = np.block([
+        [
+            np.mean(scores['r2']),
+            np.std(scores['r2']),
+            np.mean(scores['%nrmse']),
+            np.std(scores['%nrmse']),
         ],
     ])
     np.savetxt(
@@ -1133,8 +1404,10 @@ def action_plot_paper_figures(
     experiment_path: pathlib.Path,
     cross_validation_path: pathlib.Path,
     predictions_path: pathlib.Path,
+    predictions_sysid_path: pathlib.Path,
     spectral_radii_path: pathlib.Path,
     controller_rewrap_path: pathlib.Path,
+    duffing_path: pathlib.Path,
     figure_path: pathlib.Path,
 ):
     """Plot paper figures."""
@@ -1142,8 +1415,10 @@ def action_plot_paper_figures(
     exp = joblib.load(experiment_path)
     cv = joblib.load(cross_validation_path)
     pred = joblib.load(predictions_path)
+    pred_sysid = joblib.load(predictions_sysid_path)
     spect_rad = joblib.load(spectral_radii_path)
     cont_rewrap = joblib.load(controller_rewrap_path)
+    duffing = joblib.load(duffing_path)
     # Create output directory
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     # Set colors
@@ -1160,6 +1435,11 @@ def action_plot_paper_figures(
         'new_const': OKABE_ITO['vermillion'],
         'lstsq': OKABE_ITO['blue'],
         'new_lstsq': OKABE_ITO['vermillion'],
+        'cl_arx': OKABE_ITO['yellow'],
+        'duff_cl_kp': OKABE_ITO['blue'],
+        'duff_ol_kp': OKABE_ITO['sky blue'],
+        'duff_cl_arx': OKABE_ITO['vermillion'],
+        'duff_ol_arx': OKABE_ITO['orange'],
     }
     labels = {
         'ref': 'Measured',
@@ -1173,6 +1453,11 @@ def action_plot_paper_figures(
         'new_const': 'Reconstructed',
         'lstsq': 'Identified',
         'new_lstsq': 'Reconstructed',
+        'cl_arx': 'CL ARX',
+        'duff_cl_kp': 'CL EDMD',
+        'duff_ol_kp': 'EDMD',
+        'duff_cl_arx': 'CL ARX',
+        'duff_ol_arx': 'ARX',
     }
     # Set test episode to plot
     test_ep = 0
@@ -1289,7 +1574,7 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes((0.42, 0.06, 0.5, 0.5), projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1432,7 +1717,7 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         ax = fig.add_subplot(projection='polar')
-        axins = fig.add_axes([0.42, 0.06, 0.5, 0.5], projection='polar')
+        axins = fig.add_axes((0.42, 0.06, 0.5, 0.5), projection='polar')
         theta = np.linspace(0, 2 * np.pi)
         ev = {
             'cl_score_cl_reg':
@@ -1570,35 +1855,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'predictions_cl':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
@@ -1673,35 +1963,40 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'predictions_ol':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
@@ -1780,39 +2075,60 @@ def action_plot_paper_figures(
         )
     elif figure_path.stem == 'errors_cl':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['closed_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        X_test_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['X_test'].items()
+        }
+        Xp_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['Xp'].items()
         }
         t = np.arange(X_test['cl_from_cl'].shape[0]) * exp['t_step']
         fig, ax = plt.subplots(
@@ -1822,8 +2138,8 @@ def action_plot_paper_figures(
             constrained_layout=True,
             figsize=(LW, LW),
         )
-        for i, a in enumerate(ax.ravel()):
-            a.plot(
+        for i in range(ax.shape[0]):
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1832,7 +2148,7 @@ def action_plot_paper_figures(
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
             )
-            a.plot(
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1841,7 +2157,27 @@ def action_plot_paper_figures(
                 color=colors['ol_score_cl_reg'],
                 label=labels['ol_score_cl_reg'],
             )
-            a.plot(
+            if i == 2:
+                ax[i].plot(
+                    t,
+                    _percent_error(
+                        X_test_arx['cl'][:, 0],
+                        Xp_arx['cl'][:, 0],
+                    ),
+                    color=colors['cl_arx'],
+                    label=labels['cl_arx'],
+                )
+            if i == 3:
+                ax[i].plot(
+                    t,
+                    _percent_error(
+                        X_test_arx['cl'][:, 1],
+                        Xp_arx['cl'][:, 1],
+                    ),
+                    color=colors['cl_arx'],
+                    label=labels['cl_arx'],
+                )
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1850,7 +2186,7 @@ def action_plot_paper_figures(
                 color=colors['cl_score_ol_reg'],
                 label=labels['cl_score_ol_reg'],
             )
-            a.plot(
+            ax[i].plot(
                 t,
                 _percent_error(
                     X_test['cl_from_cl'][:, i],
@@ -1860,7 +2196,7 @@ def action_plot_paper_figures(
                 label=labels['cl_score_cl_reg'],
                 linestyle=':',
             )
-            a.set_ylim([-120, 120])
+            ax[i].set_ylim([-120, 120])
         ax[0].set_ylabel(r'$\Delta x_1^\mathrm{c}(t)$ (\%)')
         ax[1].set_ylabel(r'$\Delta x_2^\mathrm{c}(t)$ (\%)')
         ax[2].set_ylabel(r'$\Delta x_1^\mathrm{p}(t)$ (\%)')
@@ -1869,51 +2205,73 @@ def action_plot_paper_figures(
         ax[3].set_xlabel(r'$t$ (s)')
         fig.legend(
             handles=[
-                ax[0].get_lines()[0],
-                ax[0].get_lines()[2],
-                ax[0].get_lines()[1],
-                ax[0].get_lines()[3],
+                ax[2].get_lines()[0],
+                ax[2].get_lines()[3],
+                ax[2].get_lines()[1],
+                ax[2].get_lines()[4],
+                ax[2].get_lines()[2],
             ],
             loc='upper center',
-            ncol=2,
+            ncol=3,
             handlelength=1,
             bbox_to_anchor=(0.5, 0.02),
         )
     elif figure_path.stem == 'errors_ol':
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['X_test'].items()
         }
         Xp_cl_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_cl_reg'].items()
         }
         Xp_cl_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['cl_score_ol_reg'].items()
         }
         Xp_ol_score_cl_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_cl_reg'].items()
         }
         Xp_ol_score_ol_reg = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
             for (key, value) in pred['Xp']['ol_score_ol_reg'].items()
+        }
+        X_test_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['X_test'].items()
+        }
+        Xp_arx = {
+            key:
+            pykoop.split_episodes(
+                value,
+                episode_feature=exp['closed_loop']['episode_feature'],
+            )[test_ep][1]
+            for (key, value) in pred_sysid['Xp'].items()
         }
         t = np.arange(X_test['ol_from_ol'].shape[0]) * exp['t_step']
         fig, ax = plt.subplots(
@@ -1941,6 +2299,17 @@ def action_plot_paper_figures(
                 ),
                 color=colors['ol_score_ol_reg'],
                 label=labels['ol_score_ol_reg'],
+            )
+            # ARX diverges so quickly, only plot first few steps
+            n_step_arx = 10
+            ax[i].plot(
+                t[:n_step_arx],
+                _percent_error(
+                    X_test_arx['ol'][:n_step_arx, i],
+                    Xp_arx['ol'][:n_step_arx, i],
+                ),
+                color=colors['cl_arx'],
+                label=labels['cl_arx'],
             )
             ax[i].plot(
                 t,
@@ -1976,9 +2345,10 @@ def action_plot_paper_figures(
         fig.legend(
             handles=[
                 ax[0].get_lines()[1],
-                ax[0].get_lines()[2],
-                ax[0].get_lines()[0],
                 ax[0].get_lines()[3],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[4],
+                ax[0].get_lines()[2],
                 ax[2].get_lines()[0],
             ],
             loc='upper center',
@@ -1995,7 +2365,8 @@ def action_plot_paper_figures(
             figsize=(LW, LW),
         )
         X_test = {
-            key: pykoop.split_episodes(
+            key:
+            pykoop.split_episodes(
                 value,
                 episode_feature=exp['open_loop']['episode_feature'],
             )[test_ep][1]
@@ -2477,11 +2848,473 @@ def action_plot_paper_figures(
             handlelength=1,
             bbox_to_anchor=(0.5, 0.02),
         )
+    elif figure_path.stem == 'duffing_train':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        ep_cl_train = duffing['eps_cl_train'][0][1]
+        t = np.arange(ep_cl_train.shape[0]) * duffing['t_step']
+        ax[0].plot(t, ep_cl_train[:, 1], color=colors['ref'])
+        ax[1].plot(t, ep_cl_train[:, 2], color=colors['ref'])
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[0].set_yticks([-1, -0.5, 0, 0.5, 1])
+        ax[1].set_yticks([-1, -0.5, 0, 0.5, 1])
+        ax[0].set_ylim([-1.4, 1.4])
+        ax[1].set_ylim([-1.4, 1.4])
+        ax[1].set_ylabel(r'$r(t)$ (m)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+    elif figure_path.stem == 'duffing_traj_cl':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_cl'][:, 1],
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_cl'],
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['ep_cl_test'][:, 1],
+            '--',
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_cl_test'][:, 2],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[1].set_ylabel(r'$r(t)$ (m)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        fig.align_ylabels()
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[0],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'duffing_traj_ol':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_ol_from_ol'],
+            color=colors['duff_ol_kp'],
+            label=labels['duff_ol_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_kp_ol_from_cl'],
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_ol_from_ol'],
+            color=colors['duff_ol_arx'],
+            label=labels['duff_ol_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['Xp_tf_ol_from_cl'],
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            duffing['ep_ol_test'][:, 0],
+            '--',
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_ol_test'][:, 1],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$x(t)$ (m)')
+        ax[1].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (N)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[1].set_yticks([-2, -1, 0, 1, 2])
+        ax[1].set_ylim([-2.2, 2.2])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[3],
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'duffing_err_cl':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_cl_test'][:, 1],
+                duffing['Xp_tf_cl'],
+            ),
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_cl_test'][:, 1],
+                duffing['Xp_kp_cl'][:, 1],
+            ),
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_cl_test'][:, 2],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$\Delta x(t)$ (\%)')
+        ax[1].set_ylabel(r'$r(t)$ (m)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[0].set_ylim([-110, 110])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
+    elif figure_path.stem == 'duffing_err_ol':
+        fig, ax = plt.subplots(
+            2,
+            1,
+            sharex=True,
+            constrained_layout=True,
+            figsize=(LW, LW),
+        )
+        t = np.arange(duffing['ep_cl_test'].shape[0]) * duffing['t_step']
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_tf_ol_from_ol'],
+            ),
+            color=colors['duff_ol_arx'],
+            label=labels['duff_ol_arx'],
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_tf_ol_from_cl'],
+            ),
+            color=colors['duff_cl_arx'],
+            label=labels['duff_cl_arx'],
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_ol'],
+            ),
+            color=colors['duff_ol_kp'],
+            label=labels['duff_ol_kp'],
+        )
+        ax[0].plot(
+            t,
+            _percent_error(
+                duffing['ep_ol_test'][:, 0],
+                duffing['Xp_kp_ol_from_cl'],
+            ),
+            color=colors['duff_cl_kp'],
+            label=labels['duff_cl_kp'],
+        )
+        ax[1].plot(
+            t,
+            duffing['ep_ol_test'][:, 1],
+            color=colors['ref'],
+            label=labels['ref'],
+        )
+        ax[0].set_ylabel(r'$\Delta x(t)$ (\%)')
+        ax[1].set_ylabel(r'$\upsilon^\mathrm{p}(t)$ (N)')
+        ax[1].set_xlabel(r'$t$ (s)')
+        ax[0].set_ylim([-50, 50])
+        fig.legend(
+            handles=[
+                ax[0].get_lines()[0],
+                ax[0].get_lines()[1],
+                ax[0].get_lines()[2],
+                ax[0].get_lines()[3],
+                ax[1].get_lines()[0],
+            ],
+            loc='upper center',
+            ncol=3,
+            handlelength=1,
+            bbox_to_anchor=(0.5, 0.02),
+        )
     else:
         raise ValueError('Invalid `figure_path`.')
     # Save figure
     fig.savefig(figure_path, bbox_inches='tight', pad_inches=0.05)
     plt.close(fig)
+
+
+def action_duffing(
+    duffing_path: pathlib.Path,
+    duffing_scores_path: pathlib.Path,
+):
+    """Simulate and identify Duffing oscillator."""
+    # Simulation parameters
+    t_range = (0, 10)
+    t_step = 1e-2
+    t = np.arange(*t_range, t_step)
+    rng = np.random.default_rng(seed=1234)
+    covariance = np.diag([2]) * t_step
+    covariance_test = None
+    # Set controller
+    k_p = 1
+    k_i = 1
+    s = control.TransferFunction.s
+    pid_c = k_p + k_i * (1 / s)
+    pid_d = pid_c.sample(t_step)
+    pid = control.reachable_form(control.tf2ss(pid_d))[0]
+    # Generate training and test data
+    n_ep = 11
+    n_tr = n_ep - 1
+    X_ol_train, X_cl_train = _generate_duffing_episodes(
+        0,
+        n_tr,
+        t_step,
+        t_range,
+        pid,
+        covariance,
+        rng,
+    )
+    X_ol_test, X_cl_test = _generate_duffing_episodes(
+        n_tr,
+        n_ep,
+        t_step,
+        t_range,
+        pid,
+        covariance_test,
+        rng,
+    )
+    # Specify lifting functions
+    order = 6
+    lf_cl = [
+        (
+            'delay',
+            pykoop.DelayLiftingFn(order, order),
+        ),
+        (
+            'rbf',
+            pykoop.RbfLiftingFn(
+                rbf='thin_plate',
+                shape=0.2,
+                centers=pykoop.QmcCenters(
+                    n_centers=50,
+                    qmc=scipy.stats.qmc.LatinHypercube,
+                    random_state=666,
+                ),
+            ),
+        ),
+    ]
+    lf_ol = [(
+        'split',
+        pykoop.SplitPipeline(
+            lifting_functions_state=lf_cl,
+            lifting_functions_input=None,
+        ),
+    )]
+    # Fit open-loop Koopman model
+    kp_ol = pykoop.KoopmanPipeline(
+        lifting_functions=lf_ol,
+        regressor=pykoop.Edmd(),
+    ).fit(
+        X_ol_train,
+        n_inputs=1,
+        episode_feature=True,
+    )
+    # Fit closed-loop Koopman model
+    kp_cl = cl_koopman_pipeline.ClKoopmanPipeline(
+        lifting_functions=lf_cl,
+        regressor=cl_koopman_pipeline.ClEdmdConstrainedOpt(
+            alpha=0,
+            picos_eps=1e-8,
+            solver_params={
+                'solver': 'mosek',
+                'dualize': False,
+                'abs_dual_fsb_tol': 1e-9,
+                'abs_ipm_opt_tol': 1e-9,
+                'abs_prim_fsb_tol': 1e-9,
+                'rel_dual_fsb_tol': 1e-9,
+                'rel_ipm_opt_tol': 1e-9,
+                'rel_prim_fsb_tol': 1e-9,
+            },
+        ),
+        controller=(pid.A, pid.B, pid.C, pid.D),
+        C_plant=None,
+    ).fit(
+        X_cl_train,
+        n_inputs=1,
+        episode_feature=True,
+    )
+    # Split up episodes for system ID
+    eps_cl_train = pykoop.split_episodes(X_cl_train, episode_feature=True)
+    eps_ol_train = pykoop.split_episodes(X_ol_train, episode_feature=True)
+    ep_cl_test = pykoop.split_episodes(X_cl_test, episode_feature=True)[0][1]
+    ep_ol_test = pykoop.split_episodes(X_ol_test, episode_feature=True)[0][1]
+    # Fit closed-loop ARX model
+    num_lst = []
+    den_lst = []
+    for i, X_cl_train_i in eps_cl_train:
+        id = sippy.system_identification(
+            X_cl_train_i[:, 1],
+            X_cl_train_i[:, 2],
+            'ARX',
+            tsample=t_step,
+            ARX_orders=[order, 1, 0],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    tf_cl = control.TransferFunction(num, den, dt=t_step)
+    # Recover open-loop system
+    tf_cont = pid_d
+    tf_ol_from_cl = tf_cl / (tf_cont - (tf_cont * tf_cl))
+    # Fit open-loop ARX model
+    num_lst = []
+    den_lst = []
+    for i, X_ol_train_i in eps_ol_train:
+        id = sippy.system_identification(
+            X_ol_train_i[:, 0],
+            X_ol_train_i[:, 1],
+            'ARX',
+            tsample=t_step,
+            ARX_orders=[order, 1, 0],
+        )
+        num_lst.append(id.NUMERATOR)
+        den_lst.append(id.DENOMINATOR)
+    num = np.average(num_lst, axis=0)
+    den = np.average(den_lst, axis=0)
+    tf_ol_from_ol = control.TransferFunction(num, den, dt=t_step)
+    # Predict closed-loop trajectories
+    Xp_kp_cl = kp_cl.predict_trajectory(ep_cl_test, episode_feature=False)
+    _, Xp_tf_cl = control.forced_response(tf_cl, U=ep_cl_test[:, 1])
+    # Predict open-loop trajectories
+    Xp_kp_ol_from_ol = kp_ol.predict_trajectory(
+        ep_ol_test,
+        episode_feature=False,
+    )
+    Xp_kp_ol_from_cl = kp_cl.kp_plant_.predict_trajectory(
+        ep_ol_test,
+        episode_feature=False,
+    )
+    _, Xp_tf_ol_from_ol = control.forced_response(
+        tf_ol_from_ol,
+        U=ep_ol_test[:, 1],
+    )
+    _, Xp_tf_ol_from_cl = control.forced_response(
+        tf_ol_from_cl,
+        U=ep_ol_test[:, 1],
+    )
+    # Make results path
+    duffing_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save scores
+    csv_scores = np.block([
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_kp_ol_from_ol[:, 0]),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_kp_ol_from_ol[:, 0]),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_kp_ol_from_cl[:, 0]),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_kp_ol_from_cl[:, 0]),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_tf_ol_from_ol),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_tf_ol_from_ol),
+        ],
+        [
+            _percent_mean_error(ep_ol_test[:, 0], Xp_tf_ol_from_cl),
+            _percent_rms_error(ep_ol_test[:, 0], Xp_tf_ol_from_cl),
+        ],
+    ])
+    np.savetxt(
+        duffing_scores_path,
+        csv_scores,
+        fmt='%.3f',
+        delimiter=',',
+        header='%ME, %NRMSE',
+        comments='',
+    )
+    # Save results
+    output = {
+        't_step': t_step,
+        'n_inputs': 1,
+        'episode_feature': True,
+        'kp_ol': kp_ol,
+        'kp_cl': kp_cl,
+        'tf_cl': tf_cl,
+        'tf_ol_from_ol': tf_ol_from_ol,
+        'tf_ol_from_cl': tf_ol_from_cl,
+        'eps_cl_train': eps_cl_train,
+        'eps_ol_train': eps_ol_train,
+        'ep_cl_test': ep_cl_test,
+        'ep_ol_test': ep_ol_test,
+        'Xp_kp_cl': Xp_kp_cl,
+        'Xp_tf_cl': Xp_tf_cl,
+        'Xp_kp_ol_from_ol': Xp_kp_ol_from_ol[:, 0],
+        'Xp_kp_ol_from_cl': Xp_kp_ol_from_cl[:, 0],
+        'Xp_tf_ol_from_ol': Xp_tf_ol_from_ol,
+        'Xp_tf_ol_from_cl': Xp_tf_ol_from_cl,
+    }
+    joblib.dump(output, duffing_path)
 
 
 def _eigvals(koopman_pipeline: pykoop.KoopmanPipeline) -> float:
@@ -2570,3 +3403,351 @@ def _percent_error(reference: np.ndarray, predicted: np.ndarray) -> np.ndarray:
     ampl = np.max(np.abs(reference))
     percent_error = (reference - predicted) / ampl * 100
     return percent_error
+
+
+def _combine_tf(
+    G: Union[np.ndarray, List[List[control.TransferFunction]]]
+) -> control.TransferFunction:
+    """Combine array-like of SISO transfer functions into a MIMO TF.
+
+    Parameters
+    ----------
+    G : Union[np.ndarray, List[List[control.TransferFunction]]]
+        Array-like of SISO transfer function objects.
+
+    Returns
+    -------
+    control.TransferFunction :
+        MIMO transfer function object.
+    """
+    G = np.array(G)
+    num = []
+    den = []
+    for i_out in range(G.shape[0]):
+        for j_out in range(G[i_out, 0].noutputs):
+            num_row = []
+            den_row = []
+            for i_in in range(G.shape[1]):
+                for j_in in range(G[i_out, i_in].ninputs):
+                    num_row.append(G[i_out, i_in].num[j_out][j_in])
+                    den_row.append(G[i_out, i_in].den[j_out][j_in])
+            num.append(num_row)
+            den.append(den_row)
+    G_tf = control.TransferFunction(num, den, dt=G[0][0].dt)
+    return G_tf
+
+
+def _split_tf(G: control.TransferFunction) -> np.ndarray:
+    """Split MIMO transfer function into array of SISO TFs.
+
+    Parameters
+    ----------
+    G : control.TranferFunction
+        MIMO transfer function object.
+
+    Returns
+    -------
+    np.ndarray
+        Array of SISO transfer function.s
+
+    """
+    G_split_lst = []
+    for i_out in range(G.noutputs):
+        row = []
+        for i_in in range(G.ninputs):
+            row.append(
+                control.TransferFunction(
+                    G.num[i_out][i_in],
+                    G.den[i_out][i_in],
+                    dt=G.dt,
+                ))
+        G_split_lst.append(row)
+    G_split = np.array(G_split_lst, dtype=object)
+    return G_split
+
+
+class _DuffingOscillator():
+    """Duffing oscillator.
+
+    ``mass * x_ddot + damping * x_dot + stiffness * x + hardening * x^3 = u``
+    """
+
+    def __init__(
+        self,
+        mass: float,
+        stiffness: float,
+        damping: float,
+        hardening: float,
+    ) -> None:
+        """Instantiate :class:`_DuffingOscillator`.
+
+        Parameters
+        ----------
+        mass : float
+            Mass; coefficient for second derivative of ``x``.
+        stiffness : float
+            Stiffness; coefficient for ``x``.
+        damping : float
+            Damping; coefficient for first derivative of ``x``.
+        hardening : float
+            Nonlinear spring stiffness; cofficient for ``x^3``.
+        """
+        self.mass = mass
+        self.stiffness = stiffness
+        self.damping = damping
+        self.hardening = hardening
+
+    def f(self, t: float, x: np.ndarray, u: np.ndarray):
+        """Implement differential equation.
+
+        Parameters
+        ----------
+        t : float
+            Time (s), unused.
+        x : np.ndarray
+            State, one-dimensional.
+        u : np.ndarray
+            Input, scalar.
+
+        Returns
+        -------
+        np.ndarray :
+            Time derivative of state.
+        """
+        x_dot = np.array([
+            x[1],
+            (-self.stiffness / self.mass * x[0]) +
+            (-self.damping / self.mass * x[1]) +
+            (-self.hardening / self.mass * x[0]**3) + (1 / self.mass * u),
+        ])
+        return x_dot
+
+
+def _generate_duffing_episodes(
+    start: int,
+    stop: int,
+    t_step: float,
+    t_range: Tuple[float, float],
+    controller: control.StateSpace,
+    covariance: Optional[np.ndarray],
+    rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate training and validation episodes for Duffing oscillator.
+
+    Parameters
+    ----------
+    start : int
+        First episode feature index.
+    stop : int
+        Last episode feature index.
+    t_step : float
+        Time step (s).
+    t_range : Tuple[float, float]
+        Start and stop times of simulation.
+    controller : control.StateSpace
+        Controller.
+    covariance : np.ndarray
+        Covariance of noise to be added to measurements.
+    rng : Optional[np.random.Generator]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray] :
+        Open-loop and closed-loop datasets.
+    """
+    eps_ol = []
+    eps_cl = []
+    for ep in range(start, stop):
+        R = _prbs(-1, 1, 0.3, 2, t_range, t_step, rng=rng).reshape((-1, 1))
+        Y, U, X, Xc = _simulate_duffing(
+            R,
+            t_step,
+            controller,
+            covariance,
+            rng=rng,
+        )
+        X_ep_ol = np.hstack([Y, U])
+        X_ep_cl = np.hstack([Xc, Y, R])
+        eps_ol.append((ep, X_ep_ol))
+        eps_cl.append((ep, X_ep_cl))
+    X_ol = pykoop.combine_episodes(eps_ol, episode_feature=True)
+    X_cl = pykoop.combine_episodes(eps_cl, episode_feature=True)
+    return X_ol, X_cl
+
+
+def _simulate_duffing(
+    Rt: np.ndarray,
+    t_step: float,
+    controller: control.StateSpace,
+    covariance: Optional[np.ndarray],
+    rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Simulate one episode of a Duffing oscillator.
+
+    Parameters
+    ----------
+    Rt : np.ndarray
+        Reference signal, where time is the first axis.
+    t_step : float
+        Time step (s).
+    controller : control.StateSpace
+        Controller.
+    covariance : np.ndarray
+        Covariance of noise to be added to measurements.
+    rng : Optional[np.random.Generator]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] :
+        Plant output, input, and state, along with controller state. For each,
+        time is the first axis.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    # Simulation parameters
+    t_range = (0, Rt.shape[0] * t_step)
+    duff = _DuffingOscillator(
+        mass=0.01,
+        stiffness=0.02,
+        damping=0.1,
+        hardening=0.4,
+    )
+    # Initial conditions
+    x0 = np.array([0, 0])
+    xc0 = np.zeros((controller.nstates, ))
+    t = np.arange(*t_range, t_step)
+    X = np.zeros((2, t.size))
+    Xc = np.zeros((controller.nstates, t.size))
+    Y = np.zeros((1, t.size))
+    U = np.zeros((1, t.size))
+    if covariance is not None:
+        dist = scipy.stats.multivariate_normal(
+            mean=np.zeros((1, )),
+            cov=covariance,
+            allow_singular=True,
+            seed=rng,
+        )
+        N_unfilt = dist.rvs(size=t.size).reshape(1, -1)
+        sos = scipy.signal.butter(12, 5, output='sos', fs=(1 / t_step))
+        N = scipy.signal.sosfilt(sos, N_unfilt)
+    else:
+        N = np.zeros((
+            1,
+            t.size,
+        ))
+    X[:, 0] = x0
+    Xc[:, 0] = xc0
+    # Simulate system
+    for k in range(1, t.size + 1):
+        Y[:, k - 1] = X[0, k - 1] + N[:, k - 1]
+        e = Rt.T[:, [k - 1]] - Y[:, [k - 1]]
+        # Compute controller output
+        U[:, [k - 1]] = controller.C @ Xc[:, [k - 1]] + controller.D @ e
+        # Don't update controller and plant past last time step
+        if k >= Xc.shape[1]:
+            break
+        # Update controller
+        Xc[:, [k]] = controller.A @ Xc[:, [k - 1]] + controller.B @ e
+        # Update plant
+        X[:, k] = X[:, k - 1] + t_step * duff.f(
+            t[k - 1],
+            X[:, k - 1],
+            U[0, k - 1],
+        )
+    return Y.T, U.T, X.T, Xc.T
+
+
+def _prbs(
+    min_y: float,
+    max_y: float,
+    min_dt: float,
+    max_dt: float,
+    t_range: Tuple[float, float],
+    t_step: float,
+    rng: Optional[np.random.Generator] = None,
+) -> np.ndarray:
+    """Pseudorandom binary sequence.
+
+    Parameters
+    ----------
+    min_y : float
+        Minimum value.
+    max_y : float
+        Maximum value.
+    min_dt : float
+        Minimum step length (s).
+    max_dt : float
+        Maximum step length (s).
+    t_range : Tuple[float, float]
+        Start and stop times (s).
+    t_step : float
+        Time step (s).
+    rng : Optional[np.random.Generator]
+        Random number generator to set seed for noise.
+
+    Returns
+    -------
+    np.ndarray :
+        Pseudorandom binary sequence.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    # Compute time array
+    t = np.arange(*t_range, t_step)
+    # Convert times into steps
+    min_steps = min_dt // t_step
+    max_steps = max_dt // t_step
+    # Generate enough step intervals for the worst case, where all
+    # ``dt = min_dt``. But we will not use all of them. This approach avoids
+    # using a loop to generate the steps.
+    worst_case_steps = int(t.size // min_steps)
+    steps = np.array(rng.integers(min_steps, max_steps, worst_case_steps))
+    start_high = rng.choice([True, False])
+    # Convert steps to binary sequence
+    prbs_lst = []
+    for i in range(steps.size):
+        amplitude = max_y if ((i % 2 == 0) == start_high) else min_y
+        prbs_lst.append(amplitude * np.ones((steps[i], )))
+    prbs = np.concatenate(prbs_lst)
+    prbs_cut = prbs[:t.size]
+    return prbs_cut
+
+
+def _percent_mean_error(true: np.ndarray, meas: np.ndarray) -> float:
+    """Percent mean error of a trajectory.
+
+    Parameters
+    ----------
+    true : np.ndarray
+        True values.
+    meas : np.ndarray
+        Measured values.
+
+    Returns
+    -------
+    float
+        Percent mean error.
+    """
+    err = np.mean(true - meas) / np.max(np.abs(true)) * 100
+    return err
+
+
+def _percent_rms_error(true: np.ndarray, meas: np.ndarray) -> float:
+    """Percent RMS error of a trajectory.
+
+    Parameters
+    ----------
+    true : np.ndarray
+        True values.
+    meas : np.ndarray
+        Measured values.
+
+    Returns
+    -------
+    float
+        Percent RMS error.
+    """
+    err = np.sqrt(np.mean((true - meas)**2)) / np.max(np.abs(true)) * 100
+    return err
